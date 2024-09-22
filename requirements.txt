@@ -4,3 +4,6 @@ starlette
 groq
 uvicorn
 jinja2
+flash
+flask-socketio
+python-multipart
