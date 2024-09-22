@@ -1,0 +1,6 @@
+fastapi
+httpx
+starlette
+groq
+uvicorn
+jinja2

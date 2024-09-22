@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image Generation Web App</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="container">
+        <form onsubmit="submitForm(event)">
+            <div class="form-group">
+                <label for="initial_prompt">Initial Prompt:</label>
+                <textarea name="initial_prompt" id="initial_prompt" class="initial-prompt" onkeypress="handleKeyPress(event)" oninput="onInputChange()"></textarea>
+            </div>
+            <div class="flex-container">
+                <div class="flex-item">
+                    <label for="new_topic">New Topic:</label>
+                    <textarea name="new_topic" id="new_topic" rows="3" onkeypress="handleKeyPress(event)" oninput="onInputChange()"></textarea>
+                </div>
+                <div class="flex-item generate-section">
+                    <label for="num_images">Number of Images:</label>
+                    <div class="generate-controls">
+                        <input type="number" name="num_images" id="num_images" value="4" min="1" max="100" onchange="validateNumImages()">
+                        <button type="submit" class="button">Generate Images</button>
+                    </div>
+                </div>
+            </div>
+            <div class="form-group">
+                <label for="new_prompt">New Prompt:</label>
+                <textarea name="new_prompt" id="new_prompt" class="new-prompt"></textarea>
+            </div>
+        </form>
+        <div id="image-grid" class="image-grid"></div>
+    </div>
+    <div id="imageModal" class="modal">
+        <span class="close">&times;</span>
+        <img class="modal-content" id="modalImage">
+    </div>
+    <script src="/static/script.js"></script>
+</body>
+</html>
