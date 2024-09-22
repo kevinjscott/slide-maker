@@ -209,3 +209,102 @@ body {
     gap: 10px;
     align-items: center;
 }
+
+/* Style for the icon button */
+.icon-button {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 1.2rem; /* Adjust size for better visibility */
+    padding: 0.25rem;
+    transition: none; /* Disable transition */
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    color: #3498db; /* Optional: Change color for better visibility */
+    transform: none;
+    z-index: 10; /* Ensure the button is above the textarea */
+}
+
+/* Remove rotation on hover */
+.icon-button:hover {
+    color: #2980b9; /* Change color on hover for visual feedback */
+}
+
+/* Optional: Enhance visibility on hover without rotation */
+.icon-button:hover {
+    color: #2980b9; /* Change color on hover for visual feedback */
+}
+
+/* Optional: Add a subtle focus indicator for accessibility without a border */
+.icon-button:focus {
+    outline: none;
+}
+
+/* Container for Initial Prompt to position the reset button */
+.initial-prompt-container {
+    position: static;
+}
+
+/* Style for the icon button positioned at the top-right corner */
+.icon-button {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 1.2rem; /* Adjust size for better visibility */
+    padding: 0.25rem;
+    transition: none; /* Disable transition */
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    color: #3498db; /* Optional: Change color for better visibility */
+    transform: none;
+    z-index: 10; /* Ensure the button is above the textarea */
+}
+
+.icon-button:hover {
+    color: #2980b9;
+}
+
+.icon-button:focus {
+    outline: none;
+}
+
+/* ... existing styles ... */
+
+.textarea-wrapper {
+    position: relative;
+    display: inline-block;
+    width: 100%;
+}
+
+.textarea-wrapper textarea {
+    width: 100%;
+    padding-right: 30px; /* Make room for the button */
+}
+
+.icon-button {
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 1.2rem;
+    padding: 0.25rem;
+    color: #3498db;
+    z-index: 10; /* Ensure the button is above the textarea */
+}
+
+.icon-button:hover {
+    color: #2980b9;
+}
+
+.icon-button:focus {
+    outline: none;
+}
+
+/* Remove these styles if they exist */
+.initial-prompt-container {
+    position: static;
+}

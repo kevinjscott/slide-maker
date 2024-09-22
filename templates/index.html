@@ -9,19 +9,24 @@
 <body>
     <div class="container">
         <form onsubmit="submitForm(event)">
-            <div class="form-group">
+            <div class="form-group initial-prompt-container">
                 <label for="initial_prompt">Initial Prompt:</label>
-                <textarea name="initial_prompt" id="initial_prompt" class="initial-prompt" onkeypress="handleKeyPress(event)" oninput="onInputChange()"></textarea>
+                <div class="textarea-wrapper">
+                    <textarea id="initial_prompt" name="initial_prompt"></textarea>
+                    <button type="button" id="reset-button" class="icon-button" title="Reset to Default" aria-label="Reset to Default">
+                        🔄
+                    </button>
+                </div>
             </div>
             <div class="flex-container">
                 <div class="flex-item">
                     <label for="new_topic">New Topic:</label>
-                    <textarea name="new_topic" id="new_topic" rows="3" onkeypress="handleKeyPress(event)" oninput="onInputChange()"></textarea>
+                    <textarea name="new_topic" id="new_topic" rows="3"></textarea>
                 </div>
                 <div class="flex-item generate-section">
                     <label for="num_images">Number of Images:</label>
                     <div class="generate-controls">
-                        <input type="number" name="num_images" id="num_images" value="4" min="1" max="100" onchange="validateNumImages()">
+                        <input type="number" name="num_images" id="num_images" value="4" min="1" max="100">
                         <button type="submit" class="button">Generate Images</button>
                     </div>
                 </div>

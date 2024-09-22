@@ -1,8 +1,11 @@
 let typingTimer;
 const doneTypingInterval = 300; // milliseconds
 
+// Define the default Initial Prompt
+const DEFAULT_INITIAL_PROMPT = 'A flat 2d simple graphical illustration with a fun, ___ style containing {list items or describe the scene}. {if the image really needs supporting text...} Contains these large texts: "{list items if any, max 4 words each}" with the emphasis on "{one of the texts}".{end if}';
+
 function loadFromLocalStorage() {
-    const initialPrompt = localStorage.getItem('initialPrompt') || '';
+    const initialPrompt = localStorage.getItem('initialPrompt') || DEFAULT_INITIAL_PROMPT;
     const newTopic = localStorage.getItem('newTopic') || '';
     const newPrompt = localStorage.getItem('newPrompt') || '';
     const numImages = localStorage.getItem('numImages') || '4';
@@ -26,6 +29,12 @@ function loadFromLocalStorage() {
     document.getElementById('initial_prompt').addEventListener('input', onInputChange);
     document.getElementById('new_topic').addEventListener('input', onInputChange);
     document.getElementById('new_prompt').addEventListener('keypress', handleKeyPress);
+    
+    // Add event listener for the reset button
+    const resetButton = document.getElementById('reset-button');
+    if (resetButton) {
+        resetButton.addEventListener('click', resetToDefault);
+    }
 }
 
 function saveToLocalStorage() {
@@ -248,4 +257,13 @@ function hideStatus() {
     if (statusElement) {
         statusElement.style.display = 'none';
     }
+}
+
+// Function to reset to default Initial Prompt
+function resetToDefault() {
+    localStorage.setItem('initialPrompt', DEFAULT_INITIAL_PROMPT);
+    document.getElementById('initial_prompt').value = DEFAULT_INITIAL_PROMPT;
+    saveToLocalStorage();
+    showStatus('Initial Prompt has been reset to default.');
+    updateNewPrompt();  // Trigger the generation of the new prompt
 }
