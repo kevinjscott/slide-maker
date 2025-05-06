@@ -3,7 +3,11 @@ const doneTypingInterval = 300; // milliseconds
 
 // Define the default Initial Prompt
 const DEFAULT_INITIAL_PROMPT =
-  'A flat 2d simple graphical illustration with a fun, ___ style containing {list items or describe the scene}. {if the image really needs supporting text...} Contains these large texts: "{list items if any, max 4 words each}" with the emphasis on "{one of the texts}".{end if}';
+  'A flat 3d simple graphical illustration with a fun, modern style containing {list items or describe the scene}. {if the image really needs supporting text...} Contains these large texts: "{list items if any, max 4 words each}" with the emphasis on "{one of the texts}".{end if}';
+
+// Variables to track current image in modal view
+let currentImageIndex = 0;
+let currentImageUrls = [];
 
 function loadFromLocalStorage() {
   const initialPrompt =
@@ -27,14 +31,14 @@ function loadFromLocalStorage() {
   newTopicField.focus();
   newTopicField.select();
 
-  // Add event listeners for initial prompt, new topic, and new prompt
+  // Add event listeners for initial prompt, new topic
   document
     .getElementById("initial_prompt")
     .addEventListener("input", onInputChange);
   document.getElementById("new_topic").addEventListener("input", onInputChange);
-  document
-    .getElementById("new_prompt")
-    .addEventListener("keypress", handleKeyPress);
+
+  // We no longer need this since we're using global keyboard handling
+  // document.getElementById("new_prompt").addEventListener("keypress", handleKeyPress);
 
   // Add event listener for the reset button
   const resetButton = document.getElementById("reset-button");
@@ -174,18 +178,6 @@ function onNewTopicKeyDown() {
   clearTimeout(typingTimer);
 }
 
-function handleKeyPress(event) {
-  if (event.key === "Enter" && !event.shiftKey) {
-    event.preventDefault(); // Prevent default form submission
-
-    // Call submitForm directly instead of form.submit()
-    // form.submit() bypasses the event listeners
-    if (event.target.form) {
-      submitForm(event);
-    }
-  }
-}
-
 async function updateNewPrompt() {
   const initialPrompt = document.getElementById("initial_prompt").value;
   const newTopic = document.getElementById("new_topic").value;
@@ -288,11 +280,49 @@ function onInputChange() {
   typingTimer = setTimeout(updateNewPrompt, doneTypingInterval);
 }
 
-window.addEventListener("load", loadFromLocalStorage);
+// Add a global function to handle Cmd+Enter anywhere in the form
+function setupKeyboardShortcuts() {
+  console.log("Setting up keyboard shortcuts");
+
+  // Add a global keydown event listener to the document
+  document.addEventListener("keydown", function (event) {
+    // Check if Cmd+Enter (Mac) or Ctrl+Enter (Windows/Linux)
+    if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
+      console.log("Cmd/Ctrl+Enter detected");
+
+      // Find our form
+      const form = document.querySelector("form");
+      if (form) {
+        event.preventDefault(); // Prevent default
+        console.log("Triggering form submission via keyboard shortcut");
+        submitForm(event);
+      }
+    }
+  });
+
+  console.log("Keyboard shortcuts setup complete");
+}
+
+window.addEventListener("load", function () {
+  loadFromLocalStorage();
+  setupKeyboardShortcuts(); // Call the keyboard setup function
+});
+
 document.addEventListener("DOMContentLoaded", () => {
   const form = document.querySelector("form");
   form.removeEventListener("submit", submitForm); // Ensure no duplicate event listeners
   form.addEventListener("submit", submitForm);
+
+  // Prevent the Enter key from submitting the form
+  form.addEventListener("keypress", function (event) {
+    if (event.key === "Enter" && !event.metaKey && !event.ctrlKey) {
+      // Just let the default behavior happen for textareas
+      // But ensure it doesn't submit the form
+      if (event.target.tagName !== "TEXTAREA") {
+        event.preventDefault();
+      }
+    }
+  });
 
   // Add event listener for closing the modal
   const closeBtn = document.querySelector(".close");
@@ -300,34 +330,160 @@ document.addEventListener("DOMContentLoaded", () => {
     closeBtn.addEventListener("click", closeModal);
   }
 
-  // Add event listeners for keypress on all textarea elements
-  const textareas = document.querySelectorAll("textarea");
-  textareas.forEach((textarea) => {
-    textarea.addEventListener("keypress", handleKeyPress);
-  });
+  // We're no longer using the individual keypress handlers on textareas
+  // since we now have the global keyboard shortcut detection
 });
 
-// Add these new functions for modal functionality
+// Add these new functions for modal functionality with keyboard navigation
 function openModal(imgSrc) {
   const modal = document.getElementById("imageModal");
   const modalImg = document.getElementById("modalImage");
+
+  // Get all current images and determine index
+  currentImageUrls = JSON.parse(localStorage.getItem("savedImages") || "[]");
+  currentImageIndex = currentImageUrls.indexOf(imgSrc);
+  if (currentImageIndex < 0 && currentImageUrls.length > 0) {
+    currentImageIndex = 0;
+  }
+
   modal.style.display = "block";
   modalImg.src = imgSrc;
-  // Add event listener for the Escape key
-  document.addEventListener("keydown", closeModalOnEscape);
+
+  // Update image counter
+  showCurrentImage();
+
+  // Add event listeners for keyboard navigation
+  document.addEventListener("keydown", handleModalKeyPress);
+
+  // Add event listeners for navigation buttons
+  const prevBtn = document.getElementById("prevImage");
+  const nextBtn = document.getElementById("nextImage");
+
+  if (prevBtn) {
+    prevBtn.onclick = function () {
+      currentImageIndex =
+        (currentImageIndex - 1 + currentImageUrls.length) %
+        currentImageUrls.length;
+      showCurrentImage();
+    };
+  }
+
+  if (nextBtn) {
+    nextBtn.onclick = function () {
+      currentImageIndex = (currentImageIndex + 1) % currentImageUrls.length;
+      showCurrentImage();
+    };
+  }
+
+  // Show/hide navigation depending on number of images
+  const navInfo = document.getElementById("modalNavInfo");
+  if (navInfo) {
+    navInfo.style.display = currentImageUrls.length > 1 ? "block" : "none";
+  }
 }
 
 function closeModal() {
   const modal = document.getElementById("imageModal");
   modal.style.display = "none";
-  // Remove event listener for the Escape key
-  document.removeEventListener("keydown", closeModalOnEscape);
+
+  // Remove event listener for keyboard navigation
+  document.removeEventListener("keydown", handleModalKeyPress);
 }
 
-// Function to close modal on Escape key press
-function closeModalOnEscape(event) {
-  if (event.key === "Escape") {
-    closeModal();
+function handleModalKeyPress(event) {
+  // Only process if we have images to navigate
+  if (currentImageUrls.length <= 1) return;
+
+  switch (event.key) {
+    case "ArrowLeft":
+      // Navigate to previous image
+      currentImageIndex =
+        (currentImageIndex - 1 + currentImageUrls.length) %
+        currentImageUrls.length;
+      showCurrentImage();
+      event.preventDefault();
+      break;
+
+    case "ArrowRight":
+      // Navigate to next image
+      currentImageIndex = (currentImageIndex + 1) % currentImageUrls.length;
+      showCurrentImage();
+      event.preventDefault();
+      break;
+
+    case "ArrowUp":
+      // Navigate to previous image (alternate control)
+      currentImageIndex =
+        (currentImageIndex - 1 + currentImageUrls.length) %
+        currentImageUrls.length;
+      showCurrentImage();
+      event.preventDefault();
+      break;
+
+    case "ArrowDown":
+      // Navigate to next image (alternate control)
+      currentImageIndex = (currentImageIndex + 1) % currentImageUrls.length;
+      showCurrentImage();
+      event.preventDefault();
+      break;
+
+    case "Enter":
+      // Copy URL to clipboard and close modal
+      copyCurrentImageUrl();
+      closeModal();
+      event.preventDefault();
+      break;
+
+    case "Escape":
+      closeModal();
+      event.preventDefault();
+      break;
+  }
+}
+
+function showCurrentImage() {
+  if (
+    currentImageUrls.length > 0 &&
+    currentImageIndex >= 0 &&
+    currentImageIndex < currentImageUrls.length
+  ) {
+    const modalImg = document.getElementById("modalImage");
+    modalImg.src = currentImageUrls[currentImageIndex];
+
+    // Update the image counter in the modal
+    const counter = document.getElementById("imageCounter");
+    if (counter && currentImageUrls.length > 1) {
+      counter.textContent = `Image ${currentImageIndex + 1} of ${
+        currentImageUrls.length
+      }`;
+    }
+  }
+}
+
+async function copyCurrentImageUrl() {
+  if (
+    currentImageUrls.length > 0 &&
+    currentImageIndex >= 0 &&
+    currentImageIndex < currentImageUrls.length
+  ) {
+    const url = currentImageUrls[currentImageIndex];
+
+    try {
+      await navigator.clipboard.writeText(url);
+      showStatus("Image URL copied to clipboard!");
+      setTimeout(hideStatus, 2000);
+    } catch (err) {
+      console.error("Failed to copy URL: ", err);
+      // Fallback method for clipboard copy
+      const textArea = document.createElement("textarea");
+      textArea.value = url;
+      document.body.appendChild(textArea);
+      textArea.select();
+      document.execCommand("copy");
+      document.body.removeChild(textArea);
+      showStatus("Image URL copied to clipboard!");
+      setTimeout(hideStatus, 2000);
+    }
   }
 }
 

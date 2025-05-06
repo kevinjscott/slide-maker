@@ -27,7 +27,7 @@
                     <label for="num_images">Number of Images:</label>
                     <div class="generate-controls">
                         <input type="number" name="num_images" id="num_images" value="4" min="1" max="100">
-                        <button type="submit" class="button">Generate Images</button>
+                        <button type="submit" class="button">Generate Images <span class="shortcut-hint">(⌘+Enter)</span></button>
                     </div>
                 </div>
             </div>
@@ -41,6 +41,16 @@
     <div id="imageModal" class="modal">
         <span class="close">&times;</span>
         <img class="modal-content" id="modalImage">
+        <div id="modalNavInfo" class="modal-nav-info">
+            <div class="nav-controls">
+                <button id="prevImage">&larr;</button>
+                <span id="imageCounter">Image 1 of 4</span>
+                <button id="nextImage">&rarr;</button>
+            </div>
+            <div class="key-hint">
+                Use arrow keys to navigate • Press Enter to copy URL and close
+            </div>
+        </div>
     </div>
     <script src="/static/script.js"></script>
 </body>
