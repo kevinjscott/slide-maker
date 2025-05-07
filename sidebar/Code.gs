@@ -1,10 +1,24 @@
-/**
- * @OnlyCurrentDoc
- *
- * The above comment directs App Script to limit the scope of file access for this
- * script to only the current document. This is a best practice to protect users"
- * data.
- */
+function onInstall(e) {
+  onOpen(e);
+}
+
+function onOpen(e) {
+  Logger.log(
+    "onOpen triggered. AuthMode: " +
+      e.authMode +
+      " for document ID: " +
+      SlidesApp.getActivePresentation().getId()
+  );
+  try {
+    SlidesApp.getUi()
+      .createAddonMenu()
+      .addItem("Start My Add-on", "onHomepage")
+      .addToUi();
+    Logger.log("Menu created successfully.");
+  } catch (err) {
+    Logger.log("Error creating menu in onOpen: " + err.message);
+  }
+}
 
 /**
  * Creates a card for the add-on. This function is called when the add-on is
@@ -80,16 +94,17 @@ function showSidebar() {
 function generateSlideContent(prompt) {
   console.log("generateSlideContent called with prompt:", prompt);
 
-  const userProperties = PropertiesService.getUserProperties();
-  const groqApiKey = userProperties.getProperty("GROQ_API_KEY");
-  const ideogramApiKey = userProperties.getProperty("IDEOGRAM_API_KEY");
+  // Read API keys from script properties, not user properties
+  const scriptProperties = PropertiesService.getScriptProperties();
+  const groqApiKey = scriptProperties.getProperty("GROQ_API_KEY");
+  const ideogramApiKey = scriptProperties.getProperty("IDEOGRAM_API_KEY");
 
   if (!ideogramApiKey) {
     console.error("Ideogram API key not set.");
     return {
       ideogramImageUrls: [],
       statusMessage:
-        "Ideogram API key not set. Please configure it in the sidebar settings.",
+        "Ideogram API key not set. Please set IDEOGRAM_API_KEY in script properties.",
     };
   }
 
@@ -354,19 +369,14 @@ function insertImageToCurrentSlide(imageUrl) {
 }
 
 /**
- * Allows client-side JavaScript to store API keys.
- * This is a simplified example. For production, consider more secure storage or server-side configuration.
+ * For backward compatibility only - no longer used. API keys are set directly
+ * in Script Properties, not from the UI.
  */
 function saveApiKeys(groqKey, ideogramKey) {
-  try {
-    const userProperties = PropertiesService.getUserProperties();
-    userProperties.setProperty("GROQ_API_KEY", groqKey);
-    userProperties.setProperty("IDEOGRAM_API_KEY", ideogramKey);
-    return "API keys saved successfully.";
-  } catch (error) {
-    console.error("Error saving API keys:", error);
-    return "Error saving API keys: " + error.message;
-  }
+  console.warn(
+    "saveApiKeys called, but this function is deprecated. Keys should be set directly in Script Properties."
+  );
+  return "API keys should be set directly in Script Properties.";
 }
 
 /**
@@ -380,12 +390,13 @@ function saveApiKeys(groqKey, ideogramKey) {
 function generateNewPrompt(initialPrompt, newTopic) {
   console.log("generateNewPrompt called with topic:", newTopic);
 
-  const userProperties = PropertiesService.getUserProperties();
-  const groqApiKey = userProperties.getProperty("GROQ_API_KEY");
+  // Read Groq API key from script properties, not user properties
+  const scriptProperties = PropertiesService.getScriptProperties();
+  const groqApiKey = scriptProperties.getProperty("GROQ_API_KEY");
 
   if (!groqApiKey) {
     console.error("Groq API key not set.");
-    return "Groq API key not set. Please configure it in the sidebar settings.";
+    return "Groq API key not set. Please set GROQ_API_KEY in script properties.";
   }
 
   try {
@@ -396,9 +407,9 @@ function generateNewPrompt(initialPrompt, newTopic) {
       {
         role: "user",
         content:
-          "Create a prompt in the following style / structure, but make it about a different topic. Keep the style aspects EXACTLY the same! Anything inside {} is an instruction on how to vary the prompt, not part of the prompt itself, so don't include it.\n\n" +
+          "Create a prompt using the template, but make it about a different topic. Keep the style aspects EXACTLY the same! Anything inside {} is an instruction on how to vary the prompt, not part of the prompt itself, so don't include it.\n\n<template>" +
           initialPrompt +
-          "\n\nNew Topic: " +
+          "</template>\n\nNew Topic: " +
           newTopic,
       },
     ];

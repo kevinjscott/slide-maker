@@ -119,45 +119,6 @@
       border-radius: 4px;
       display: none;
     }
-    .config-section {
-      background-color: #f5f5f5;
-      padding: 0;
-      border-radius: 4px;
-      margin-bottom: 0;
-      overflow: hidden;
-      max-height: 0;
-      transition: max-height 0.3s ease-out, padding 0.3s ease, margin 0.3s ease;
-    }
-    .config-section.expanded {
-      max-height: 500px;
-      padding: 8px;
-      margin-bottom: 10px;
-    }
-    .config-toggle {
-      background: none;
-      border: none;
-      color: #2772db;
-      font-weight: bold;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      padding: 5px 0;
-      font-size: 14px;
-      width: 100%;
-      text-align: left;
-      margin-bottom: 5px;
-    }
-    .config-toggle:hover {
-      text-decoration: underline;
-      background: none;
-    }
-    .toggle-icon {
-      margin-right: 5px;
-      transition: transform 0.3s ease;
-    }
-    .toggle-icon.expanded {
-      transform: rotate(90deg);
-    }
     hr {
       border: none;
       border-top: 1px solid #ddd;
@@ -167,22 +128,6 @@
 </head>
 <body>
   <div class="container">
-    <button id="configToggle" class="config-toggle">
-      <span id="toggleIcon" class="toggle-icon">▶</span> Configuration
-    </button>
-    
-    <div id="configSection" class="config-section">
-      <div class="form-group">
-        <label for="groqKey">Groq API Key:</label>
-        <input type="password" id="groqKey" name="groqKey" style="height: 30px;">
-      </div>
-      <div class="form-group">
-        <label for="ideogramKey">Ideogram API Key:</label>
-        <input type="password" id="ideogramKey" name="ideogramKey" style="height: 30px;">
-      </div>
-      <button onclick="saveKeys()">Save Keys</button>
-    </div>
-
     <form id="promptForm" onsubmit="submitForm(event)">
       <div class="form-group initial-prompt-container">
         <label for="initial_prompt">Initial Prompt:</label>
@@ -224,26 +169,12 @@
       document.getElementById("initial_prompt").addEventListener("input", onInputChange);
       document.getElementById("new_topic").addEventListener("input", onInputChange);
       document.getElementById("reset-button").addEventListener("click", resetToDefault);
-      document.getElementById("configToggle").addEventListener("click", toggleConfigSection);
       
       // Set focus to new_topic field
       document.getElementById("new_topic").focus();
       
       // Setup keyboard shortcuts
       setupKeyboardShortcuts();
-    }
-    
-    function toggleConfigSection() {
-      const configSection = document.getElementById("configSection");
-      const toggleIcon = document.getElementById("toggleIcon");
-      configSection.classList.toggle("expanded");
-      toggleIcon.classList.toggle("expanded");
-      
-      if (configSection.classList.contains("expanded")) {
-        toggleIcon.textContent = "▼";
-      } else {
-        toggleIcon.textContent = "▶";
-      }
     }
     
     function showSpinner(show) {
@@ -262,35 +193,6 @@
           statusEl.style.display = "none";
         }, 3000);
       }
-    }
-
-    function saveKeys() {
-      const groqKey = document.getElementById("groqKey").value;
-      const ideogramKey = document.getElementById("ideogramKey").value;
-      
-      if (!groqKey || !ideogramKey) {
-        setStatus("Please enter both API keys.", true);
-        return;
-      }
-
-      showSpinner(true);
-      setStatus("Saving API keys...", false);
-
-      google.script.run
-        .withSuccessHandler(response => {
-          showSpinner(false);
-          setStatus(response, false);
-          // Collapse the config section after successful save
-          if (document.getElementById("configSection").classList.contains("expanded")) {
-            toggleConfigSection();
-          }
-        })
-        .withFailureHandler(error => {
-          showSpinner(false);
-          setStatus("Error saving keys: " + error.message, true);
-          console.error("Error saving keys: ", error);
-        })
-        .saveApiKeys(groqKey, ideogramKey);
     }
     
     function resetToDefault() {
