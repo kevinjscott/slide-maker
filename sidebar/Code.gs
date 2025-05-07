@@ -798,7 +798,7 @@ function generateNewPromptTemplate() {
     );
     const groqApiUrl = "https://api.groq.com/openai/v1/chat/completions";
 
-    const templateInstructions = `<template>A [flat 3d simple graphical illustration] (to be used as a full-screen PowerPoint slide) with a [fun, modern] style containing {list items or describe the scene}. {if the image really needs supporting text...} Contains these large texts: "{list items if any, max 4 words each}" with the emphasis on "{one of the texts}".{end if} Use [blue puppies] for the text lettering.</template>
+    const templateInstructions = `<template>A [flat 3d simple graphical illustration] (to be used as a full-screen PowerPoint slide) with a [fun, modern] style containing {list items or describe the scene}. Contains these large texts: "{list items if any, max 4 words each}" with the emphasis on "{one of the texts}". Use [puppies] for the text lettering.</template>
 
 ==========
 
@@ -806,11 +806,17 @@ The text above is a template for creating AI image prompts. Vary the items in sq
 
 Example outputs:
 
-A surreal digital collage (to be used as a full-screen PowerPoint slide) with a dreamy, colorful style containing {list items or describe the scene}. {if the image really needs supporting text...} Contains these large texts: "{list items if any, max 4 words each}" with the emphasis on "{one of the texts}".{end if} Use clouds for the text lettering.
+A surreal digital collage (to be used as a full-screen PowerPoint slide) with a dreamy, colorful style containing {list items or describe the scene}. Contains these large texts: "{list items if any, max 4 words each}" with the emphasis on "{one of the texts}". Use clouds for the text lettering.
 
-A watercolor illustration (to be used as a full-screen PowerPoint slide) with a gentle, calming style containing {list items or describe the scene}. {if the image really needs supporting text...} Contains these large texts: "{list items if any, max 4 words each}" with the emphasis on "{one of the texts}".{end if} Use handwritten script fonts for the text lettering.
+A watercolor illustration (to be used as a full-screen PowerPoint slide) with a gentle, calming style containing {list items or describe the scene}. Contains these large texts: "{list items if any, max 4 words each}" with the emphasis on "{one of the texts}". Use handwritten script fonts for the text lettering.
 
-A gorgeous 3d pencil sketch (to be used as a full-screen PowerPoint slide) with a vibrant, artistic style containing {list items or describe the scene}. {if the image really needs supporting text...} Contains these large texts: "{list items if any, max 4 words each}" with the emphasis on "{one of the texts}".{end if} Use artistic, brush script fonts for the text lettering.`;
+A gorgeous 3d pencil sketch (to be used as a full-screen PowerPoint slide) with a vibrant, artistic style containing {list items or describe the scene}. Contains these large texts: "{list items if any, max 4 words each}" with the emphasis on "{one of the texts}". Use artistic, brush script fonts for the text lettering.
+
+A crayon drawing (to be used as a full-screen PowerPoint slide) with a playful, childlike style containing {list items or describe the scene}. Contains these large texts: "{list items if any, max 4 words each}" with the emphasis on "{one of the texts}". Use chunky block fonts for the text lettering.
+
+A isometric flat design (to be used as a full-screen PowerPoint slide) with a clean, tech-inspired style containing {list items or describe the scene}. Contains these large texts: "{list items if any, max 4 words each}" with the emphasis on "{one of the texts}". Use geometric sans-serif fonts for the text lettering.
+
+`;
 
     const groqMessages = [
       {
@@ -822,8 +828,8 @@ A gorgeous 3d pencil sketch (to be used as a full-screen PowerPoint slide) with 
     const groqPayload = {
       messages: groqMessages,
       model: "llama-3.3-70b-versatile",
-      max_tokens: 500,
-      temperature: 0.7, // Slightly higher for more creativity
+      max_tokens: 1000,
+      temperature: 1.2,
     };
 
     console.log(
