@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 10px;
+      padding: 0;
+      color: #333;
+    }
+    .container {
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+      padding-bottom: 20px;
+    }
+    h2 {
+      margin-bottom: 10px;
+      font-size: 16px;
+      color: #2772db;
+    }
+    .form-group {
+      margin-bottom: 12px;
+    }
+    .initial-prompt-container {
+      position: relative;
+    }
+    .textarea-wrapper {
+      position: relative;
+      width: 100%;
+    }
+    label {
+      font-weight: bold;
+      margin-bottom: 5px;
+      display: block;
+      font-size: 13px;
+    }
+    input[type="text"], input[type="password"], textarea, input[type="number"] {
+      width: 100%;
+      padding: 8px;
+      margin-bottom: 5px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      box-sizing: border-box;
+      font-size: 13px;
+    }
+    .flex-container {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .flex-item {
+      flex: 1;
+    }
+    .button, button {
+      padding: 8px 12px;
+      background-color: #2772db;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: bold;
+    }
+    .button:hover, button:hover {
+      background-color: #1c5bb9;
+    }
+    .generate-button {
+      margin-top: 5px;
+      padding: 10px 15px;
+      width: 100%;
+    }
+    #reset-button {
+      position: absolute;
+      right: 5px;
+      top: 5px;
+      background: none;
+      border: none;
+      color: #666;
+      cursor: pointer;
+      font-size: 18px;
+      padding: 0;
+      width: 24px;
+      height: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    #reset-button:hover {
+      color: #2772db;
+    }
+    .shortcut-hint {
+      font-size: 11px;
+      color: #888;
+      font-weight: normal;
+    }
+    .spinner {
+      border: 3px solid #f3f3f3;
+      border-top: 3px solid #2772db;
+      border-radius: 50%;
+      width: 16px;
+      height: 16px;
+      animation: spin 1s linear infinite;
+      display: none;
+      margin-left: 10px;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    #status {
+      margin-top: 10px;
+      font-style: italic;
+      font-size: 12px;
+      padding: 5px;
+      background-color: #f8f8f8;
+      border-radius: 4px;
+      display: none;
+    }
+    .config-section {
+      background-color: #f5f5f5;
+      padding: 0;
+      border-radius: 4px;
+      margin-bottom: 0;
+      overflow: hidden;
+      max-height: 0;
+      transition: max-height 0.3s ease-out, padding 0.3s ease, margin 0.3s ease;
+    }
+    .config-section.expanded {
+      max-height: 500px;
+      padding: 8px;
+      margin-bottom: 10px;
+    }
+    .config-toggle {
+      background: none;
+      border: none;
+      color: #2772db;
+      font-weight: bold;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      padding: 5px 0;
+      font-size: 14px;
+      width: 100%;
+      text-align: left;
+      margin-bottom: 5px;
+    }
+    .config-toggle:hover {
+      text-decoration: underline;
+      background: none;
+    }
+    .toggle-icon {
+      margin-right: 5px;
+      transition: transform 0.3s ease;
+    }
+    .toggle-icon.expanded {
+      transform: rotate(90deg);
+    }
+    hr {
+      border: none;
+      border-top: 1px solid #ddd;
+      margin: 15px 0;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <button id="configToggle" class="config-toggle">
+      <span id="toggleIcon" class="toggle-icon">▶</span> API Configuration
+    </button>
+    
+    <div id="configSection" class="config-section">
+      <div class="form-group">
+        <label for="groqKey">Groq API Key:</label>
+        <input type="password" id="groqKey" name="groqKey">
+      </div>
+      <div class="form-group">
+        <label for="ideogramKey">Ideogram API Key:</label>
+        <input type="password" id="ideogramKey" name="ideogramKey">
+      </div>
+      <button onclick="saveKeys()">Save Keys</button>
+    </div>
+
+    <form id="promptForm" onsubmit="submitForm(event)">
+      <div class="form-group initial-prompt-container">
+        <label for="initial_prompt">Initial Prompt:</label>
+        <div class="textarea-wrapper">
+          <textarea id="initial_prompt" name="initial_prompt" rows="6"></textarea>
+          <button type="button" id="reset-button" title="Reset to Default" aria-label="Reset to Default">
+            🔄
+          </button>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label for="new_topic">New Topic:</label>
+        <textarea name="new_topic" id="new_topic" rows="3"></textarea>
+      </div>
+
+      <div class="form-group">
+        <label for="new_prompt">Generated Prompt:</label>
+        <textarea name="new_prompt" id="new_prompt" class="new-prompt" rows="6"></textarea>
+      </div>
+      
+      <button type="submit" class="button generate-button">Generate Images <span class="shortcut-hint">(⌘+Enter)</span></button>
+    </form>
+    
+    <div id="status"></div>
+    <div id="spinner" class="spinner"></div>
+  </div>
+
+  <script>
+    // Default Initial Prompt
+    const DEFAULT_INITIAL_PROMPT = 'A flat 3d simple graphical illustration (to be used as a full-screen PowerPoint slide) with a fun, modern style containing {list items or describe the scene}. {if the image really needs supporting text...} Contains these large texts: "{list items if any, max 4 words each}" with the emphasis on "{one of the texts}".{end if}';
+    let typingTimer;
+    const doneTypingInterval = 300; // milliseconds
+    
+    function initialize() {
+      document.getElementById("initial_prompt").value = DEFAULT_INITIAL_PROMPT;
+      
+      // Add event listeners
+      document.getElementById("initial_prompt").addEventListener("input", onInputChange);
+      document.getElementById("new_topic").addEventListener("input", onInputChange);
+      document.getElementById("reset-button").addEventListener("click", resetToDefault);
+      document.getElementById("configToggle").addEventListener("click", toggleConfigSection);
+      
+      // Set focus to new_topic field
+      document.getElementById("new_topic").focus();
+      
+      // Setup keyboard shortcuts
+      setupKeyboardShortcuts();
+    }
+    
+    function toggleConfigSection() {
+      const configSection = document.getElementById("configSection");
+      const toggleIcon = document.getElementById("toggleIcon");
+      configSection.classList.toggle("expanded");
+      toggleIcon.classList.toggle("expanded");
+      
+      if (configSection.classList.contains("expanded")) {
+        toggleIcon.textContent = "▼";
+      } else {
+        toggleIcon.textContent = "▶";
+      }
+    }
+    
+    function showSpinner(show) {
+      document.getElementById("spinner").style.display = show ? "inline-block" : "none";
+    }
+
+    function setStatus(message, isError) {
+      const statusEl = document.getElementById("status");
+      statusEl.textContent = message;
+      statusEl.style.color = isError ? "red" : "#2772db";
+      statusEl.style.display = "block";
+      
+      if (!isError) {
+        // Hide success messages after 3 seconds
+        setTimeout(() => {
+          statusEl.style.display = "none";
+        }, 3000);
+      }
+    }
+
+    function saveKeys() {
+      const groqKey = document.getElementById("groqKey").value;
+      const ideogramKey = document.getElementById("ideogramKey").value;
+      
+      if (!groqKey || !ideogramKey) {
+        setStatus("Please enter both API keys.", true);
+        return;
+      }
+
+      showSpinner(true);
+      setStatus("Saving API keys...", false);
+
+      google.script.run
+        .withSuccessHandler(response => {
+          showSpinner(false);
+          setStatus(response, false);
+          // Collapse the config section after successful save
+          if (document.getElementById("configSection").classList.contains("expanded")) {
+            toggleConfigSection();
+          }
+        })
+        .withFailureHandler(error => {
+          showSpinner(false);
+          setStatus("Error saving keys: " + error.message, true);
+          console.error("Error saving keys: ", error);
+        })
+        .saveApiKeys(groqKey, ideogramKey);
+    }
+    
+    function resetToDefault() {
+      document.getElementById("initial_prompt").value = DEFAULT_INITIAL_PROMPT;
+      setStatus("Initial prompt reset to default.", false);
+      updateNewPrompt();
+    }
+    
+    function onInputChange() {
+      clearTimeout(typingTimer);
+      typingTimer = setTimeout(updateNewPrompt, doneTypingInterval);
+    }
+    
+    function updateNewPrompt() {
+      const initialPrompt = document.getElementById("initial_prompt").value;
+      const newTopic = document.getElementById("new_topic").value;
+      
+      if (!initialPrompt || !newTopic) {
+        return; // Don't update if either field is empty
+      }
+      
+      showSpinner(true);
+      setStatus("Generating new prompt...", false);
+      
+      google.script.run
+        .withSuccessHandler(response => {
+          showSpinner(false);
+          
+          // Check if response is an error message (starts with "Failed" or "Error")
+          if (typeof response === 'string' && (response.startsWith("Failed") || response.startsWith("Error") || response.includes("API key"))) {
+            setStatus(response, true);
+            document.getElementById("new_prompt").value = "";
+          } else {
+            document.getElementById("new_prompt").value = response;
+            setStatus("New prompt generated.", false);
+          }
+        })
+        .withFailureHandler(error => {
+          showSpinner(false);
+          setStatus("Error generating prompt: " + error.message, true);
+          console.error("Error generating prompt: ", error);
+        })
+        .generateNewPrompt(initialPrompt, newTopic);
+    }
+
+    function submitForm(event) {
+      event.preventDefault();
+      const newPrompt = document.getElementById("new_prompt").value;
+      
+      if (!newPrompt) {
+        setStatus("Please provide a prompt for image generation.", true);
+        return;
+      }
+      
+      // Always use 8 images
+      const numImages = 8;
+      
+      showSpinner(true);
+      setStatus(`Generating ${numImages} images...`, false);
+
+      google.script.run
+        .withSuccessHandler(response => {
+          showSpinner(false);
+          
+          if (response && response.ideogramImageUrls && response.ideogramImageUrls.length > 0) {
+            setStatus(`${response.ideogramImageUrls.length} images generated. Choose an image to add to slides.`, false);
+          } else {
+            setStatus(response.statusMessage || "Image generation complete.", false);
+          }
+        })
+        .withFailureHandler(error => {
+          showSpinner(false);
+          setStatus("Error generating images: " + error.message, true);
+          console.error("Error generating images: ", error);
+        })
+        .generateSlideContent(newPrompt);
+    }
+    
+    function setupKeyboardShortcuts() {
+      document.addEventListener("keydown", function(event) {
+        // Check for Cmd+Enter (Mac) or Ctrl+Enter (Windows)
+        if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
+          event.preventDefault();
+          submitForm(event);
+        }
+      });
+    }
+
+    window.onload = initialize;
+  </script>
+</body>
+</html> 

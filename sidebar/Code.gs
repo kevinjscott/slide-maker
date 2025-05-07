@@ -1,0 +1,633 @@
+/**
+ * @OnlyCurrentDoc
+ *
+ * The above comment directs App Script to limit the scope of file access for this
+ * script to only the current document. This is a best practice to protect users"
+ * data.
+ */
+
+/**
+ * Creates a card for the add-on. This function is called when the add-on is
+ * opened from the Google Slides Add-ons menu.
+ *
+ * @param {Object} e The event object.
+ * @return {CardService.Card} The card to display.
+ */
+function onHomepage(e) {
+  console.log("onHomepage event object:", JSON.stringify(e));
+  return createCard("Slide Maker AI");
+}
+
+/**
+ * Handles the onFileScopeGranted trigger. This function is called when the user
+ * grants file scope access to the add-on.
+ *
+ * @param {Object} e The event object.
+ */
+function onFileScopeGranted(e) {
+  console.log("onFileScopeGranted event object:", JSON.stringify(e));
+  // Typically, you would re-render the UI or enable functionality
+  // that depends on file access. For now, we"ll just open the homepage again.
+  onHomepage(e);
+}
+
+/**
+ * Creates the main card for the add-on.
+ *
+ * @param {string} cardTitle The title for the card.
+ * @return {CardService.Card} The card to display.
+ */
+function createCard(cardTitle) {
+  return CardService.newCardBuilder()
+    .setHeader(CardService.newCardHeader().setTitle(cardTitle))
+    .addSection(
+      CardService.newCardSection()
+        .addWidget(
+          CardService.newTextParagraph().setText(
+            "Welcome, Kevin! This is the Slide Maker AI sidebar."
+          )
+        )
+        .addWidget(
+          CardService.newButtonSet().addButton(
+            CardService.newTextButton()
+              .setText("Show Sidebar")
+              .setOnClickAction(
+                CardService.newAction().setFunctionName("showSidebar")
+              )
+          )
+        )
+    )
+    .build();
+}
+
+/**
+ * Opens the sidebar. This function is called when the "Show Sidebar" button is clicked.
+ */
+function showSidebar() {
+  const ui = HtmlService.createHtmlOutputFromFile("Sidebar")
+    .setTitle("Slide Maker AI Controls")
+    .setWidth(300);
+  SlidesApp.getUi().showSidebar(ui);
+}
+
+/**
+ * Placeholder function to be called from the client-side JavaScript in the sidebar.
+ * This is where you would integrate with Groq, Ideogram, etc.
+ *
+ * @param {string} prompt The user"s prompt.
+ * @return {string} A status message.
+ */
+function generateSlideContent(prompt) {
+  console.log("generateSlideContent called with prompt:", prompt);
+
+  const userProperties = PropertiesService.getUserProperties();
+  const groqApiKey = userProperties.getProperty("GROQ_API_KEY");
+  const ideogramApiKey = userProperties.getProperty("IDEOGRAM_API_KEY");
+
+  if (!ideogramApiKey) {
+    console.error("Ideogram API key not set.");
+    return {
+      ideogramImageUrls: [],
+      statusMessage:
+        "Ideogram API key not set. Please configure it in the sidebar settings.",
+    };
+  }
+
+  let statusMessage = "";
+  let collectedImageUrls = [];
+  const num_images_to_request = 8; // Default to 8 images
+
+  // --- Ideogram API Call for Image (Using V3 with Manual Multipart/form-data) ---
+  try {
+    console.log(
+      "Attempting Ideogram API call (V3 for " +
+        num_images_to_request +
+        " images)..."
+    );
+
+    // Exact endpoint from utils.py
+    const ideogramApiUrl = "https://api.ideogram.ai/v1/ideogram-v3/generate";
+
+    // Validate and clamp num_images as done in utils.py
+    let num_images_clamped = num_images_to_request;
+    if (!(1 <= num_images_clamped && num_images_clamped <= 8)) {
+      console.log(
+        "Warning: num_images (" +
+          num_images_clamped +
+          ") is outside the Ideogram API v3 supported range of 1-8. Clamping to nearest valid value."
+      );
+      num_images_clamped = Math.max(1, Math.min(num_images_clamped, 8));
+    }
+
+    // Prepare multipart form data
+    const boundary = "Boundary_" + new Date().getTime();
+    let multipartRequestBody = "";
+
+    // Exact form fields used in utils.py
+    const formFields = {
+      prompt: prompt,
+      aspect_ratio: "16x9", // V3 uses values like "1x1", "16x9"
+      magic_prompt: "AUTO", // V3 valid values: "AUTO", "ON", "OFF"
+      negative_prompt:
+        "small text, chaotic, strange characters, nonsense, duplicate, ugly, mutation, disgusting, unrealistic",
+      num_images: String(num_images_clamped), // Must be string for multipart
+      rendering_speed: "DEFAULT", // V3 valid values: "TURBO", "DEFAULT", "QUALITY"
+    };
+
+    for (const key in formFields) {
+      multipartRequestBody += "--" + boundary + "\r\n";
+      multipartRequestBody +=
+        'Content-Disposition: form-data; name="' + key + '"\r\n\r\n';
+      multipartRequestBody += formFields[key] + "\r\n";
+    }
+
+    // Color palette - exact same configuration as in utils.py
+    const colorPaletteConfig = {
+      members: [
+        { color_hex: "#00205B", color_weight: 0.3 },
+        { color_hex: "#0053FF", color_weight: 0.2 },
+        { color_hex: "#B9CBD3", color_weight: 0.2 },
+        { color_hex: "#F1F1F1", color_weight: 0.15 },
+        { color_hex: "#97999B", color_weight: 0.15 },
+      ],
+    };
+
+    multipartRequestBody += "--" + boundary + "\r\n";
+    multipartRequestBody +=
+      'Content-Disposition: form-data; name="color_palette"\r\n';
+    multipartRequestBody += "Content-Type: application/json\r\n\r\n"; // Specify content type for this part
+    multipartRequestBody += JSON.stringify(colorPaletteConfig) + "\r\n";
+
+    // Closing boundary
+    multipartRequestBody += "--" + boundary + "--\r\n";
+
+    // Exact headers from utils.py
+    const ideogramOptions = {
+      method: "post",
+      contentType: "multipart/form-data; boundary=" + boundary,
+      headers: {
+        "Api-Key": ideogramApiKey, // Matching the Python code's header name
+      },
+      payload: Utilities.newBlob(multipartRequestBody).getBytes(), // Convert to bytes
+      muteHttpExceptions: true,
+    };
+
+    // For debugging
+    console.log(
+      "Ideogram V3 Request Headers:",
+      JSON.stringify({
+        "Api-Key": "REDACTED",
+        "Content-Type": ideogramOptions.contentType,
+      })
+    );
+
+    // Make the request
+    console.log("Sending request to Ideogram V3...");
+    const ideogramResponse = UrlFetchApp.fetch(ideogramApiUrl, ideogramOptions);
+    const ideogramResponseCode = ideogramResponse.getResponseCode();
+    const ideogramResponseBody = ideogramResponse.getContentText();
+    console.log("Ideogram V3 Response Code:", ideogramResponseCode);
+
+    // Parse response similar to utils.py
+    if (ideogramResponseCode === 200) {
+      try {
+        const ideogramResult = JSON.parse(ideogramResponseBody);
+        console.log(
+          "Ideogram V3 API Response (first 200 chars):",
+          JSON.stringify(ideogramResult).substring(0, 200) + "..."
+        );
+
+        // Extract data array exactly like utils.py
+        const generated_data = ideogramResult.data || [];
+
+        if (generated_data && generated_data.length > 0) {
+          // Collect all URLs from the data array
+          generated_data.forEach((item) => {
+            if (item.url) {
+              collectedImageUrls.push(item.url);
+              console.log(
+                "Found image URL:",
+                item.url.substring(0, 60) + "..."
+              );
+            } else {
+              console.warn(
+                "Warning: No 'url' found in image item:",
+                JSON.stringify(item).substring(0, 100)
+              );
+            }
+          });
+
+          statusMessage +=
+            collectedImageUrls.length +
+            " image URL(s) received from Ideogram V3. ";
+
+          if (collectedImageUrls.length === 0) {
+            statusMessage +=
+              "But no URLs found in data items. Check response structure. ";
+            console.warn(
+              "Ideogram V3: data array present but no URLs found in items"
+            );
+          }
+        } else {
+          statusMessage +=
+            "No 'data' array found or 'data' array is empty in Ideogram API response. ";
+          console.warn(
+            "Warning: No 'data' array found or 'data' array is empty in API response."
+          );
+        }
+      } catch (parseError) {
+        statusMessage += "Failed to parse Ideogram V3 JSON response. ";
+        console.error(
+          "Error parsing Ideogram V3 JSON response:",
+          parseError,
+          "Response body (first 500 chars):",
+          ideogramResponseBody.substring(0, 500)
+        );
+      }
+    } else if (ideogramResponseCode === 202) {
+      // Handle 202 Accepted (async job)
+      statusMessage +=
+        "Ideogram request accepted (202). This is an asynchronous job. ";
+      console.warn(
+        "Ideogram returned 202 Accepted. Response (first 500 chars):",
+        ideogramResponseBody.substring(0, 500)
+      );
+    } else {
+      // Handle error responses
+      statusMessage +=
+        "Ideogram API (V3) error (" + ideogramResponseCode + "). ";
+      try {
+        const errorDetails = JSON.parse(ideogramResponseBody);
+        console.error(
+          "Ideogram API (V3) Error Details:",
+          JSON.stringify(errorDetails)
+        );
+      } catch (e) {
+        console.error(
+          "Ideogram API (V3) Error (non-JSON response):",
+          ideogramResponseBody.substring(0, 500)
+        );
+      }
+    }
+  } catch (e) {
+    console.error("Error during Ideogram API (V3) call:", e);
+    statusMessage +=
+      "Error processing Ideogram (V3) request: " + e.toString() + ". ";
+  }
+
+  console.log("generateSlideContent final status: ", statusMessage);
+  console.log(
+    "Returning to client: Image URLs count: ",
+    collectedImageUrls.length
+  );
+
+  // Store the image URLs in script properties for the image picker to access
+  if (collectedImageUrls.length > 0) {
+    const scriptProperties = PropertiesService.getScriptProperties();
+    scriptProperties.setProperty(
+      "TEMP_IMAGE_URLS",
+      JSON.stringify(collectedImageUrls)
+    );
+    console.log(
+      "Stored",
+      collectedImageUrls.length,
+      "image URLs in script properties"
+    );
+
+    // Open the image picker dialog automatically
+    showImagePickerDialog(collectedImageUrls);
+  }
+
+  return {
+    ideogramImageUrls: collectedImageUrls,
+    statusMessage:
+      statusMessage.trim() || "Image generation process completed.",
+  };
+}
+
+/**
+ * Inserts text into the currently selected slide.
+ * @param {string} text The text to insert.
+ */
+function insertTextToCurrentSlide(text) {
+  try {
+    const presentation = SlidesApp.getActivePresentation();
+    const selection = presentation.getSelection();
+    const currentPage = selection.getCurrentPage();
+
+    if (!currentPage) {
+      console.error("No slide selected or found.");
+      SlidesApp.getUi().alert("Please select a slide first.");
+      return;
+    }
+    // Insert text box - adjust position and size as needed
+    const shape = currentPage.insertTextBox(text, 100, 100, 300, 50); // x, y, width, height
+    console.log("Text box inserted:", shape.getObjectId());
+  } catch (e) {
+    console.error("Error inserting text to slide:", e);
+    SlidesApp.getUi().alert("Error inserting text: " + e.message);
+  }
+}
+
+/**
+ * Inserts an image from a URL into the currently selected slide.
+ * @param {string} imageUrl The URL of the image to insert.
+ */
+function insertImageToCurrentSlide(imageUrl) {
+  try {
+    const presentation = SlidesApp.getActivePresentation();
+    const selection = presentation.getSelection();
+    const currentPage = selection.getCurrentPage();
+
+    if (!currentPage) {
+      console.error("No slide selected or found.");
+      SlidesApp.getUi().alert("Please select a slide first.");
+      return;
+    }
+    // Insert image - adjust position and size as needed
+    const image = currentPage.insertImage(imageUrl, 50, 150, 400, 300); // x, y, width, height
+    console.log("Image inserted:", image.getObjectId());
+  } catch (e) {
+    console.error("Error inserting image to slide:", e);
+    SlidesApp.getUi().alert("Error inserting image: " + e.message);
+  }
+}
+
+/**
+ * Allows client-side JavaScript to store API keys.
+ * This is a simplified example. For production, consider more secure storage or server-side configuration.
+ */
+function saveApiKeys(groqKey, ideogramKey) {
+  try {
+    const userProperties = PropertiesService.getUserProperties();
+    userProperties.setProperty("GROQ_API_KEY", groqKey);
+    userProperties.setProperty("IDEOGRAM_API_KEY", ideogramKey);
+    return "API keys saved successfully.";
+  } catch (error) {
+    console.error("Error saving API keys:", error);
+    return "Error saving API keys: " + error.message;
+  }
+}
+
+/**
+ * Generates a new prompt using Groq based on an initial prompt template and a new topic.
+ * This is used to generate the content for the "new_prompt" field.
+ *
+ * @param {string} initialPrompt The prompt template
+ * @param {string} newTopic The new topic to use in the template
+ * @return {string} The generated prompt
+ */
+function generateNewPrompt(initialPrompt, newTopic) {
+  console.log("generateNewPrompt called with topic:", newTopic);
+
+  const userProperties = PropertiesService.getUserProperties();
+  const groqApiKey = userProperties.getProperty("GROQ_API_KEY");
+
+  if (!groqApiKey) {
+    console.error("Groq API key not set.");
+    return "Groq API key not set. Please configure it in the sidebar settings.";
+  }
+
+  try {
+    console.log("Attempting Groq API call for new prompt generation...");
+    const groqApiUrl = "https://api.groq.com/openai/v1/chat/completions";
+
+    const groqMessages = [
+      {
+        role: "user",
+        content:
+          "Create a prompt in the following style / structure, but make it about a different topic. Keep the style aspects EXACTLY the same! Anything inside {} is an instruction on how to vary the prompt, not part of the prompt itself, so don't include it.\n\n" +
+          initialPrompt +
+          "\n\nNew Topic: " +
+          newTopic,
+      },
+    ];
+
+    const groqPayload = {
+      messages: groqMessages,
+      model: "llama-3.3-70b-versatile", // Updated to match utils.py
+      max_tokens: 1000,
+      temperature: 0.3,
+    };
+
+    console.log("Groq API payload:", JSON.stringify(groqPayload));
+
+    const groqOptions = {
+      method: "post",
+      contentType: "application/json",
+      headers: {
+        Authorization: "Bearer " + groqApiKey,
+        "Content-Type": "application/json", // Explicitly set Content-Type
+      },
+      payload: JSON.stringify(groqPayload),
+      muteHttpExceptions: true,
+    };
+
+    console.log("Making Groq API request...");
+    const groqResponse = UrlFetchApp.fetch(groqApiUrl, groqOptions);
+    const groqResponseCode = groqResponse.getResponseCode();
+    const groqResponseBody = groqResponse.getContentText();
+
+    console.log("Groq API response code:", groqResponseCode);
+    console.log(
+      "Groq API response (first 100 chars):",
+      groqResponseBody.substring(0, 100)
+    );
+
+    if (groqResponseCode === 200) {
+      const groqResult = JSON.parse(groqResponseBody);
+      if (
+        groqResult.choices &&
+        groqResult.choices.length > 0 &&
+        groqResult.choices[0].message &&
+        groqResult.choices[0].message.content
+      ) {
+        const newPrompt = groqResult.choices[0].message.content.trim();
+        console.log(
+          "Generated new prompt (first 50 chars):",
+          newPrompt.substring(0, 50) + "..."
+        );
+        return newPrompt;
+      } else {
+        console.error("Failed to parse prompt from Groq response");
+        return (
+          "Failed to generate new prompt about " +
+          newTopic +
+          ". Please try again."
+        );
+      }
+    } else {
+      console.error("Groq API error:", groqResponseCode, groqResponseBody);
+      return (
+        "Failed to generate new prompt about " +
+        newTopic +
+        ". Please try again."
+      );
+    }
+  } catch (e) {
+    console.error("Error generating new prompt:", e);
+    return (
+      "Failed to generate new prompt about " + newTopic + ". Please try again."
+    );
+  }
+}
+
+/**
+ * Inserts an image from a URL into a new slide created after the current slide.
+ * @param {string} imageUrl The URL of the image to insert.
+ * @return {string} A status message indicating success or failure.
+ */
+function addImageToNewSlideFromUrl(imageUrl) {
+  try {
+    if (!imageUrl) {
+      console.error("addImageToNewSlideFromUrl: No image URL provided.");
+      return "Error: No image URL provided.";
+    }
+
+    const presentation = SlidesApp.getActivePresentation();
+    const currentSelection = presentation.getSelection();
+    let insertionIndex = 0;
+
+    if (currentSelection) {
+      const currentPage = currentSelection.getCurrentPage();
+      if (currentPage) {
+        const slides = presentation.getSlides();
+        // Find the index of the current slide
+        insertionIndex = slides.indexOf(currentPage);
+        if (insertionIndex >= 0) {
+          // Increment the index to insert AFTER the current slide
+          insertionIndex++;
+        } else {
+          insertionIndex = slides.length; // Default to end if not found
+        }
+      } else {
+        // No specific page selected, default to end
+        insertionIndex = presentation.getSlides().length;
+      }
+    } else {
+      // No selection, default to end
+      insertionIndex = presentation.getSlides().length;
+    }
+
+    console.log("Inserting new slide at index:", insertionIndex);
+
+    // Insert a new slide at the determined index
+    const newSlide = presentation.insertSlide(insertionIndex);
+
+    // Get dimensions of the new slide for proper scaling
+    const slideWidth = presentation.getPageWidth();
+    const slideHeight = presentation.getPageHeight();
+
+    // Insert the image
+    const image = newSlide.insertImage(imageUrl);
+
+    try {
+      // Try multiple methods to ensure the slide is selected
+
+      // Method 1: Use the slide's direct select method
+      newSlide.selectAsCurrentPage();
+
+      // Method 2: Use the presentation selection object
+      const selection = SlidesApp.getActivePresentation().getSelection();
+      selection.selectPage(newSlide);
+
+      console.log("Slide selection attempted using multiple methods");
+    } catch (selectionError) {
+      console.error("Error while trying to select the slide:", selectionError);
+      // Continue execution even if selection fails
+    }
+
+    console.log(
+      "Image inserted into new slide: " +
+        newSlide.getObjectId() +
+        ", Image ID: " +
+        image.getObjectId()
+    );
+
+    return "Image successfully added to a new slide.";
+  } catch (e) {
+    console.error("Error in addImageToNewSlideFromUrl:", e);
+    SlidesApp.getUi().alert("Could not add image to new slide: " + e.message);
+    return "Error adding image to new slide: " + e.message;
+  }
+}
+
+/**
+ * Server-side function to show the image picker dialog.
+ * This is a fallback if the client-side dialog approach doesn't work.
+ *
+ * @param {Array} imageUrls Array of image URLs to display in the picker
+ * @return {string} Status message
+ */
+function showImagePickerDialog(imageUrls) {
+  try {
+    if (!imageUrls || !Array.isArray(imageUrls) || imageUrls.length === 0) {
+      console.error("showImagePickerDialog: No image URLs provided");
+      return "Error: No images to display";
+    }
+
+    console.log(
+      "Showing server-side image picker with",
+      imageUrls.length,
+      "images"
+    );
+
+    // Store the image URLs temporarily in script properties
+    const scriptProperties = PropertiesService.getScriptProperties();
+    scriptProperties.setProperty("TEMP_IMAGE_URLS", JSON.stringify(imageUrls));
+    console.log("Stored image URLs in script properties");
+
+    // Create HTML output (not template)
+    const htmlOutput = HtmlService.createHtmlOutputFromFile("ImagePicker")
+      .setWidth(1000)
+      .setHeight(600)
+      .setTitle("Select an Image");
+
+    // Show the modal dialog
+    SlidesApp.getUi().showModalDialog(htmlOutput, "Select an Image");
+    return "Image selection dialog displayed";
+  } catch (e) {
+    console.error("Error showing image picker dialog:", e);
+    SlidesApp.getUi().alert(
+      "Could not show image selection dialog: " + e.message
+    );
+    return "Error showing image selection dialog: " + e.message;
+  }
+}
+
+/**
+ * Gets the temporarily stored image URLs.
+ * This is called from the ImagePicker.html file.
+ *
+ * @return {Array} Array of image URLs
+ */
+function getStoredImageUrls() {
+  const scriptProperties = PropertiesService.getScriptProperties();
+  const storedUrls = scriptProperties.getProperty("TEMP_IMAGE_URLS");
+
+  console.log(
+    "Retrieved stored image URLs:",
+    storedUrls ? "data found" : "no data"
+  );
+
+  if (storedUrls) {
+    try {
+      return JSON.parse(storedUrls);
+    } catch (e) {
+      console.error("Error parsing stored image URLs:", e);
+      return [];
+    }
+  }
+
+  return [];
+}
+
+/**
+ * For server-side templating to include files with scriptlets.
+ *
+ * @param {string} filename The name of the HTML file to include
+ * @return {string} The HTML content
+ */
+function include(filename) {
+  return HtmlService.createHtmlOutputFromFile(filename).getContent();
+}

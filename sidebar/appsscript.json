@@ -1,0 +1,30 @@
+{
+  "timeZone": "America/New_York",
+  "dependencies": {},
+  "exceptionLogging": "STACKDRIVER",
+  "runtimeVersion": "V8",
+  "oauthScopes": [
+    "https://www.googleapis.com/auth/script.container.ui",
+    "https://www.googleapis.com/auth/presentations.currentonly",
+    "https://www.googleapis.com/auth/script.external_request",
+    "https://www.googleapis.com/auth/drive.file"
+  ],
+  "addOns": {
+    "common": {
+      "name": "Slide Maker AI",
+      "logoUrl": "https://logo.clearbit.com/pgatour.com",
+      "layoutProperties": {
+        "primaryColor": "#2772db",
+        "secondaryColor": "#fefefe"
+      }
+    },
+    "slides": {
+      "homepageTrigger": {
+        "runFunction": "onHomepage"
+      },
+      "onFileScopeGrantedTrigger": {
+        "runFunction": "onFileScopeGranted"
+      }
+    }
+  }
+}

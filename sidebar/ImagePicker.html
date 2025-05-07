@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+      background-color: rgba(0, 0, 0, 0.95);
+      color: white;
+      width: 100%;
+      height: 100vh;
+      overflow: hidden;
+      outline: none; /* Remove focus outline */
+      tabindex: "-1"; /* Make body focusable */
+    }
+    .image-viewer-container {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      width: 100%;
+      box-sizing: border-box;
+    }
+    .main-view {
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+      position: relative;
+      align-items: center;
+      justify-content: center;
+      padding: 10px;
+    }
+    .image-container {
+      position: relative;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      width: 100%;
+      height: 100%;
+      max-height: calc(100vh - 120px);
+    }
+    .image-container img {
+      max-width: 100%;
+      max-height: 100%;
+      object-fit: contain;
+    }
+    .navbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 15px 20px;
+    }
+    .title {
+      font-size: 18px;
+      font-weight: bold;
+    }
+    .controls {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background-color: rgba(34, 34, 34, 0.9);
+      padding: 15px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .nav-controls {
+      display: flex;
+      align-items: center;
+      gap: 15px;
+    }
+    .key-hint {
+      color: #ccc;
+      font-size: 14px;
+    }
+    .nav-button {
+      background: rgba(255, 255, 255, 0.15);
+      color: white;
+      border: none;
+      padding: 8px 15px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+    .nav-button:hover {
+      background: rgba(255, 255, 255, 0.25);
+    }
+    .action-buttons {
+      display: flex;
+      gap: 10px;
+    }
+    .image-counter {
+      font-size: 14px;
+      color: #ccc;
+      margin: 0 15px;
+    }
+    .spinner {
+      border: 4px solid rgba(255, 255, 255, 0.3);
+      border-radius: 50%;
+      border-top: 4px solid #2772db;
+      width: 40px;
+      height: 40px;
+      animation: spin 1s linear infinite;
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      margin-top: -20px;
+      margin-left: -20px;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    .status-message {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(0, 0, 0, 0.7);
+      padding: 20px;
+      border-radius: 5px;
+      text-align: center;
+      max-width: 80%;
+    }
+    .nav-arrow {
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      background: rgba(0, 0, 0, 0.5);
+      color: white;
+      border: none;
+      width: 50px;
+      height: 50px;
+      border-radius: 25px;
+      font-size: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      opacity: 0.5;
+      transition: opacity 0.2s;
+    }
+    .nav-arrow:hover {
+      opacity: 1;
+    }
+    .prev-arrow {
+      left: 20px;
+    }
+    .next-arrow {
+      right: 20px;
+    }
+    .loading-text {
+      margin-top: 10px;
+      font-style: italic;
+    }
+  </style>
+</head>
+<body>
+  <div class="image-viewer-container">
+    <div class="navbar">
+      <div class="title">Select an Image</div>
+      <div class="key-hint">Use ← → arrow keys to navigate • Enter to select • Esc to cancel</div>
+    </div>
+    
+    <div class="main-view">
+      <div id="imageContainer" class="image-container">
+        <!-- Loading spinner shown initially -->
+        <div id="spinner" class="spinner"></div>
+        <div id="loadingText" class="loading-text">Loading images...</div>
+        
+        <!-- Image will be inserted here by JavaScript -->
+      </div>
+      
+      <!-- Navigation arrows -->
+      <button id="prevArrow" class="nav-arrow prev-arrow">←</button>
+      <button id="nextArrow" class="nav-arrow next-arrow">→</button>
+      
+      <!-- Status message container -->
+      <div id="statusMessage" class="status-message" style="display: none;"></div>
+    </div>
+    
+    <div class="controls">
+      <div class="nav-controls">
+        <button id="prevButton" class="nav-button">← Previous</button>
+        <span id="imageCounter" class="image-counter">Image 1 of 8</span>
+        <button id="nextButton" class="nav-button">Next →</button>
+      </div>
+      <div class="action-buttons">
+        <button id="cancelButton" class="nav-button">Cancel (Esc)</button>
+        <button id="selectButton" class="nav-button">Add to Slides (Enter)</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Track the current image index and all image URLs
+    let currentIndex = 0;
+    let imageUrls = [];
+    let imageLoaded = false;
+    
+    // Initialize the viewer, fetch images from server
+    function initialize() {
+      console.log("Initializing image viewer...");
+      
+      // Set the body to be focusable and focus it immediately
+      document.body.setAttribute('tabindex', '-1');
+      document.body.focus();
+      
+      // Set up event listeners
+      document.getElementById("prevArrow").addEventListener("click", navigateToPrevious);
+      document.getElementById("nextArrow").addEventListener("click", navigateToNext);
+      document.getElementById("prevButton").addEventListener("click", navigateToPrevious);
+      document.getElementById("nextButton").addEventListener("click", navigateToNext);
+      document.getElementById("selectButton").addEventListener("click", selectCurrentImage);
+      document.getElementById("cancelButton").addEventListener("click", cancelSelection);
+      
+      // Set up keyboard navigation
+      document.addEventListener("keydown", handleKeyPress);
+      
+      // Fetch image URLs from server
+      fetchImagesFromServer();
+    }
+    
+    // Fetch images from the server-side properties
+    function fetchImagesFromServer() {
+      console.log("Fetching images from server...");
+      
+      google.script.run
+        .withSuccessHandler(function(urls) {
+          console.log("Received", urls ? urls.length : 0, "images from server");
+          
+          if (urls && urls.length > 0) {
+            imageUrls = urls;
+            currentIndex = 0;
+            
+            // Preload all images in the background
+            preloadAllImages(imageUrls);
+            
+            // Load the first image
+            displayCurrentImage();
+            updateImageCounter();
+          } else {
+            showError("No images were received from the server.");
+          }
+        })
+        .withFailureHandler(function(error) {
+          console.error("Error retrieving images:", error);
+          showError("Failed to retrieve images: " + error);
+        })
+        .getStoredImageUrls();
+    }
+    
+    // Preload all images to improve navigation performance
+    function preloadAllImages(urls) {
+      if (!urls || urls.length === 0) return;
+      
+      console.log("Preloading all images in background...");
+      urls.forEach((url, index) => {
+        if (index !== currentIndex) { // Skip current index as it's already being loaded
+          const img = new Image();
+          img.src = url;
+        }
+      });
+    }
+    
+    // Display the current image
+    function displayCurrentImage() {
+      if (imageUrls.length === 0 || currentIndex < 0 || currentIndex >= imageUrls.length) {
+        showError("No image available to display.");
+        return;
+      }
+      
+      const container = document.getElementById("imageContainer");
+      const spinner = document.getElementById("spinner");
+      const loadingText = document.getElementById("loadingText");
+      
+      // Remove any existing image
+      const existingImg = container.querySelector("img");
+      if (existingImg) {
+        container.removeChild(existingImg);
+      }
+      
+      // Show loading indicators
+      spinner.style.display = "block";
+      loadingText.style.display = "block";
+      imageLoaded = false;
+      
+      // Create and add the new image
+      const img = document.createElement("img");
+      img.style.display = "none"; // Hide until loaded
+      
+      // Preload the next image for faster navigation
+      if (currentIndex < imageUrls.length - 1) {
+        const nextImg = new Image();
+        nextImg.src = imageUrls[currentIndex + 1];
+      }
+      
+      img.onload = function() {
+        // Hide loading indicators, show image
+        spinner.style.display = "none";
+        loadingText.style.display = "none";
+        img.style.display = "block";
+        imageLoaded = true;
+      };
+      
+      img.onerror = function() {
+        spinner.style.display = "none";
+        loadingText.style.display = "none";
+        showError("Failed to load image #" + (currentIndex + 1));
+      };
+      
+      img.src = imageUrls[currentIndex];
+      container.appendChild(img);
+      
+      console.log("Displaying image at index:", currentIndex);
+    }
+    
+    // Update the image counter text
+    function updateImageCounter() {
+      const counter = document.getElementById("imageCounter");
+      counter.textContent = `Image ${currentIndex + 1} of ${imageUrls.length}`;
+    }
+    
+    // Navigate to the previous image
+    function navigateToPrevious() {
+      if (imageUrls.length <= 1) return;
+      
+      currentIndex = (currentIndex - 1 + imageUrls.length) % imageUrls.length;
+      console.log("Navigating to previous image, new index:", currentIndex);
+      displayCurrentImage();
+      updateImageCounter();
+    }
+    
+    // Navigate to the next image
+    function navigateToNext() {
+      if (imageUrls.length <= 1) return;
+      
+      currentIndex = (currentIndex + 1) % imageUrls.length;
+      console.log("Navigating to next image, new index:", currentIndex);
+      displayCurrentImage();
+      updateImageCounter();
+    }
+    
+    // Handle keyboard navigation
+    function handleKeyPress(event) {
+      console.log("Key pressed:", event.key);
+      
+      switch (event.key) {
+        case "ArrowLeft":
+          navigateToPrevious();
+          event.preventDefault();
+          break;
+          
+        case "ArrowRight":
+          navigateToNext();
+          event.preventDefault();
+          break;
+          
+        case "Enter":
+          selectCurrentImage();
+          event.preventDefault();
+          break;
+          
+        case "Escape":
+          cancelSelection();
+          event.preventDefault();
+          break;
+      }
+    }
+    
+    // Select the current image
+    function selectCurrentImage() {
+      if (!imageLoaded || imageUrls.length === 0) {
+        showError("No image is currently loaded to select.");
+        return;
+      }
+      
+      const selectedUrl = imageUrls[currentIndex];
+      
+      // Show status message
+      document.getElementById("statusMessage").textContent = "Adding image to slide...";
+      document.getElementById("statusMessage").style.display = "block";
+      
+      // Call server function to add image to slide
+      google.script.run
+        .withSuccessHandler(function(response) {
+          console.log("Image added to slide:", response);
+          google.script.host.close();
+        })
+        .withFailureHandler(function(error) {
+          showError("Failed to add image to slide: " + error);
+        })
+        .addImageToNewSlideFromUrl(selectedUrl);
+    }
+    
+    // Cancel and close the dialog
+    function cancelSelection() {
+      google.script.host.close();
+    }
+    
+    // Show error message
+    function showError(message) {
+      const statusEl = document.getElementById("statusMessage");
+      statusEl.textContent = message;
+      statusEl.style.display = "block";
+      
+      // Hide the spinner if it's showing
+      document.getElementById("spinner").style.display = "none";
+      document.getElementById("loadingText").style.display = "none";
+    }
+    
+    // Initialize when the page loads
+    window.onload = function() {
+      initialize();
+      
+      // Force focus on body after a small delay to ensure dialog is completely loaded
+      setTimeout(function() {
+        document.body.focus();
+        console.log("Forced focus on body element");
+      }, 100);
+    };
+  </script>
+</body>
+</html> 
