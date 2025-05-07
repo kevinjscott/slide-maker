@@ -486,34 +486,75 @@ function addImageToNewSlideFromUrl(imageUrl) {
 
     const presentation = SlidesApp.getActivePresentation();
     const currentSelection = presentation.getSelection();
-    let insertionIndex = 0;
-    let slideToSelect = null;
+    let insertionIndex = presentation.getSlides().length; // Default to end of the presentation
 
     if (currentSelection) {
-      const currentPage = currentSelection.getCurrentPage();
-      if (currentPage) {
-        const slides = presentation.getSlides();
-        insertionIndex = slides.indexOf(currentPage);
-        if (insertionIndex >= 0) {
-          insertionIndex++; // Insert AFTER the current slide
-        } else {
-          insertionIndex = slides.length; // Default to end if current slide not found
-          console.warn(
-            "Current slide not found in presentation, appending to end."
+      const currentPage = currentSelection.getCurrentPage(); // This is a Page object
+
+      // Proceed to find index only if a page is selected and it's a SLIDE
+      if (
+        currentPage &&
+        currentPage.getPageType() === SlidesApp.PageType.SLIDE
+      ) {
+        const currentSlide = currentPage.asSlide(); // Explicitly work with a Slide object
+        const slides = presentation.getSlides(); // Array of Slide objects in the presentation
+        let foundPageIndex = -1;
+
+        // Try to find the slide by object reference first
+        foundPageIndex = slides.indexOf(currentSlide);
+
+        if (foundPageIndex === -1) {
+          // If not found by reference, try to find by ID (more reliable)
+          console.log(
+            "Selected slide not found by reference, attempting to find by ID."
           );
+          const currentSlideId = currentSlide.getObjectId();
+          console.log("ID of selected slide: " + currentSlideId);
+          for (let i = 0; i < slides.length; i++) {
+            if (slides[i].getObjectId() === currentSlideId) {
+              foundPageIndex = i;
+              console.log("Selected slide found by ID at index: " + i);
+              break;
+            }
+          }
         }
+
+        if (foundPageIndex >= 0) {
+          insertionIndex = foundPageIndex + 1; // Insert AFTER the found slide
+          console.log(
+            "Determined insertion index after selected slide: " + insertionIndex
+          );
+        } else {
+          // This case should be rare if a slide was selected and is part of the presentation
+          console.warn(
+            "Selected slide (type SLIDE) could not be located in the presentation's slide list. Appending to end."
+          );
+          // insertionIndex remains default (end of presentation)
+        }
+      } else if (currentPage) {
+        // Selected page is not a regular slide (e.g., notes master, layout)
+        console.log(
+          "Selected page is not a content slide (type: " +
+            currentPage.getPageType() +
+            "). New slide will be appended to the end."
+        );
+        // insertionIndex remains default (end of presentation)
       } else {
-        // No specific page selected, default to end
-        insertionIndex = presentation.getSlides().length;
-        console.log("No current page selected, appending to end.");
+        // No specific page element is part of the selection
+        console.log(
+          "No specific page selected from current selection. New slide will be appended to the end."
+        );
+        // insertionIndex remains default (end of presentation)
       }
     } else {
-      // No selection, default to end
-      insertionIndex = presentation.getSlides().length;
-      console.log("No selection, appending to end.");
+      // No selection in the presentation at all
+      console.log(
+        "No selection in presentation. New slide will be appended to the end."
+      );
+      // insertionIndex remains default (end of presentation)
     }
 
-    console.log("Attempting to insert new slide at index:", insertionIndex);
+    console.log("Final insertion index for new slide:", insertionIndex);
 
     // Insert a new slide at the determined index
     const newSlide = presentation.insertSlide(insertionIndex);
@@ -563,9 +604,35 @@ function addImageToNewSlideFromUrl(imageUrl) {
         image.getObjectId()
     );
 
-    // Select the new slide
-    newSlide.selectAsCurrentPage();
-    console.log("New slide selected:", newSlide.getObjectId());
+    // Select the new slide - using multiple approaches for reliability
+    try {
+      // Method 1: Use selectAsCurrentPage
+      newSlide.selectAsCurrentPage();
+
+      // Method 2: Create a selection with this slide and apply it
+      const selection = SlidesApp.getSelection();
+      const range = SlidesApp.getActivePresentation()
+        .getSelection()
+        .getPageRange();
+      if (range) {
+        range.removeRange(); // Clear any existing page selection
+      }
+
+      // Force selection refresh by creating a new Page Range selection with just this page
+      const newRange = SlidesApp.newPageRange().addPage(newSlide);
+      SlidesApp.getActivePresentation().setSelection(newRange);
+
+      console.log(
+        "New slide selected using multiple methods:",
+        newSlide.getObjectId()
+      );
+    } catch (selectionError) {
+      console.error(
+        "Error while trying to select the new slide:",
+        selectionError
+      );
+      // Continue execution even if selection fails
+    }
 
     return "Image successfully added to a new slide and selected.";
   } catch (e) {
