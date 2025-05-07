@@ -3,7 +3,7 @@ const doneTypingInterval = 300; // milliseconds
 
 // Define the default Initial Prompt
 const DEFAULT_INITIAL_PROMPT =
-  'A flat 3d simple graphical illustration with a fun, modern style containing {list items or describe the scene}. {if the image really needs supporting text...} Contains these large texts: "{list items if any, max 4 words each}" with the emphasis on "{one of the texts}".{end if}';
+  'A flat 3d simple graphical illustration (to be used as a full-sccreen PowerPoint slide) with a fun, modern style containing {list items or describe the scene}. {if the image really needs supporting text...} Contains these large texts: "{list items if any, max 4 words each}" with the emphasis on "{one of the texts}".{end if}';
 
 // Variables to track current image in modal view
 let currentImageIndex = 0;
