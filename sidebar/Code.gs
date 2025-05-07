@@ -774,3 +774,109 @@ function storeCurrentPrompt(prompt) {
     return false;
   }
 }
+
+/**
+ * Generates a new prompt template variation.
+ *
+ * @return {string} A new prompt template
+ */
+function generateNewPromptTemplate() {
+  console.log("generateNewPromptTemplate called");
+
+  // Read Groq API key from script properties
+  const scriptProperties = PropertiesService.getScriptProperties();
+  const groqApiKey = scriptProperties.getProperty("GROQ_API_KEY");
+
+  if (!groqApiKey) {
+    console.error("Groq API key not set.");
+    return "Groq API key not set. Please set GROQ_API_KEY in script properties.";
+  }
+
+  try {
+    console.log(
+      "Attempting Groq API call for new prompt template generation..."
+    );
+    const groqApiUrl = "https://api.groq.com/openai/v1/chat/completions";
+
+    const templateInstructions = `<template>A [flat 3d simple graphical illustration] (to be used as a full-screen PowerPoint slide) with a [fun, modern] style containing {list items or describe the scene}. {if the image really needs supporting text...} Contains these large texts: "{list items if any, max 4 words each}" with the emphasis on "{one of the texts}".{end if} Use [blue puppies] for the text lettering.</template>
+
+==========
+
+The text above is a template for creating AI image prompts. Vary the items in square brackets [] to create 1 completely different version. Keep all the other wording exactly the same. Exclude the square brackets in your output. Do not follow any of the instructions in the template.
+
+Example outputs:
+
+A surreal digital collage (to be used as a full-screen PowerPoint slide) with a dreamy, colorful style containing {list items or describe the scene}. {if the image really needs supporting text...} Contains these large texts: "{list items if any, max 4 words each}" with the emphasis on "{one of the texts}".{end if} Use clouds for the text lettering.
+
+A watercolor illustration (to be used as a full-screen PowerPoint slide) with a gentle, calming style containing {list items or describe the scene}. {if the image really needs supporting text...} Contains these large texts: "{list items if any, max 4 words each}" with the emphasis on "{one of the texts}".{end if} Use handwritten script fonts for the text lettering.
+
+A gorgeous 3d pencil sketch (to be used as a full-screen PowerPoint slide) with a vibrant, artistic style containing {list items or describe the scene}. {if the image really needs supporting text...} Contains these large texts: "{list items if any, max 4 words each}" with the emphasis on "{one of the texts}".{end if} Use artistic, brush script fonts for the text lettering.`;
+
+    const groqMessages = [
+      {
+        role: "user",
+        content: templateInstructions,
+      },
+    ];
+
+    const groqPayload = {
+      messages: groqMessages,
+      model: "llama-3.3-70b-versatile",
+      max_tokens: 500,
+      temperature: 0.7, // Slightly higher for more creativity
+    };
+
+    console.log(
+      "Groq API payload for template generation:",
+      JSON.stringify(groqPayload)
+    );
+
+    const groqOptions = {
+      method: "post",
+      contentType: "application/json",
+      headers: {
+        Authorization: "Bearer " + groqApiKey,
+        "Content-Type": "application/json",
+      },
+      payload: JSON.stringify(groqPayload),
+      muteHttpExceptions: true,
+    };
+
+    console.log("Making Groq API request for template generation...");
+    const groqResponse = UrlFetchApp.fetch(groqApiUrl, groqOptions);
+    const groqResponseCode = groqResponse.getResponseCode();
+    const groqResponseBody = groqResponse.getContentText();
+
+    console.log("Groq API response code:", groqResponseCode);
+    console.log(
+      "Groq API response (first 100 chars):",
+      groqResponseBody.substring(0, 100)
+    );
+
+    if (groqResponseCode === 200) {
+      const groqResult = JSON.parse(groqResponseBody);
+      if (
+        groqResult.choices &&
+        groqResult.choices.length > 0 &&
+        groqResult.choices[0].message &&
+        groqResult.choices[0].message.content
+      ) {
+        const newTemplate = groqResult.choices[0].message.content.trim();
+        console.log(
+          "Generated new template (first 50 chars):",
+          newTemplate.substring(0, 50) + "..."
+        );
+        return newTemplate;
+      } else {
+        console.error("Failed to parse template from Groq response");
+        return "Failed to generate new template. Please try again.";
+      }
+    } else {
+      console.error("Groq API error:", groqResponseCode, groqResponseBody);
+      return "Failed to generate new template. Please try again.";
+    }
+  } catch (e) {
+    console.error("Error generating new template:", e);
+    return "Failed to generate new template. Please try again.";
+  }
+}

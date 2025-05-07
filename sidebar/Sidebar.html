@@ -30,6 +30,11 @@
       position: relative;
       width: 100%;
     }
+    .template-buttons {
+      display: flex;
+      justify-content: flex-end;
+      margin-bottom: 5px;
+    }
     label {
       font-weight: bold;
       margin-bottom: 5px;
@@ -72,24 +77,24 @@
       padding: 10px 15px;
       width: 100%;
     }
-    #reset-button {
-      position: absolute;
-      right: 5px;
-      top: 5px;
+    #reset-button, #generate-template-button {
       background: none;
       border: none;
       color: #666;
       cursor: pointer;
       font-size: 18px;
-      padding: 0;
-      width: 24px;
-      height: 24px;
+      padding: 5px;
+      margin-left: 5px;
+      width: 30px;
+      height: 30px;
       display: flex;
       align-items: center;
       justify-content: center;
+      border-radius: 4px;
     }
-    #reset-button:hover {
+    #reset-button:hover, #generate-template-button:hover {
       color: #2772db;
+      background-color: rgba(39, 114, 219, 0.1);
     }
     .shortcut-hint {
       font-size: 11px;
@@ -130,12 +135,17 @@
   <div class="container">
     <form id="promptForm" onsubmit="submitForm(event)">
       <div class="form-group initial-prompt-container">
-        <label for="initial_prompt">Initial Prompt:</label>
-        <div class="textarea-wrapper">
-          <textarea id="initial_prompt" name="initial_prompt" rows="10"></textarea>
+        <label for="initial_prompt">Prompt Template:</label>
+        <div class="template-buttons">
+          <button type="button" id="generate-template-button" title="Generate New Template" aria-label="Generate New Template">
+            ✨
+          </button>
           <button type="button" id="reset-button" title="Reset to Default" aria-label="Reset to Default">
             🔄
           </button>
+        </div>
+        <div class="textarea-wrapper">
+          <textarea id="initial_prompt" name="initial_prompt" rows="10"></textarea>
         </div>
       </div>
 
@@ -158,7 +168,7 @@
 
   <script>
     // Default Initial Prompt
-    const DEFAULT_INITIAL_PROMPT = 'A flat 3d simple graphical illustration (to be used as a full-screen PowerPoint slide) with a fun, modern style containing {list items or describe the scene}. {if the image really needs supporting text...} Contains these large texts: "{list items if any, max 4 words each}" with the emphasis on "{one of the texts}".{end if}';
+    const DEFAULT_INITIAL_PROMPT = 'A flat 3d simple graphical illustration (to be used as a full-screen PowerPoint slide) with a fun, modern style containing {list items or describe the scene}. Contains these large texts: "{list items if any, max 4 words each}" with the emphasis on "{one of the texts}". Use bold fonts for the text lettering.';
     let typingTimer;
     const doneTypingInterval = 300; // milliseconds
     
@@ -169,6 +179,7 @@
       document.getElementById("initial_prompt").addEventListener("input", onInputChange);
       document.getElementById("new_topic").addEventListener("input", onInputChange);
       document.getElementById("reset-button").addEventListener("click", resetToDefault);
+      document.getElementById("generate-template-button").addEventListener("click", generateNewTemplate);
       
       // Set focus to new_topic field
       document.getElementById("new_topic").focus();
@@ -197,8 +208,33 @@
     
     function resetToDefault() {
       document.getElementById("initial_prompt").value = DEFAULT_INITIAL_PROMPT;
-      setStatus("Initial prompt reset to default.", false);
+      setStatus("Prompt template reset to default.", false);
       updateNewPrompt();
+    }
+    
+    function generateNewTemplate() {
+      showSpinner(true);
+      setStatus("Generating new prompt template...", false);
+      
+      google.script.run
+        .withSuccessHandler(response => {
+          showSpinner(false);
+          
+          if (typeof response === 'string' && (response.startsWith("Failed") || response.startsWith("Error") || response.includes("API key"))) {
+            setStatus(response, true);
+          } else {
+            document.getElementById("initial_prompt").value = response;
+            setStatus("New prompt template generated.", false);
+            // Update the generated prompt based on the new template
+            updateNewPrompt();
+          }
+        })
+        .withFailureHandler(error => {
+          showSpinner(false);
+          setStatus("Error generating template: " + error.message, true);
+          console.error("Error generating template: ", error);
+        })
+        .generateNewPromptTemplate();
     }
     
     function onInputChange() {
