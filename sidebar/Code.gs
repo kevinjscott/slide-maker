@@ -474,6 +474,7 @@ function generateNewPrompt(initialPrompt, newTopic) {
 
 /**
  * Inserts an image from a URL into a new slide created after the current slide.
+ * Also adds the generated prompt to the slide notes.
  * @param {string} imageUrl The URL of the image to insert.
  * @return {string} A status message indicating success or failure.
  */
@@ -483,6 +484,11 @@ function addImageToNewSlideFromUrl(imageUrl) {
       console.error("addImageToNewSlideFromUrl: No image URL provided.");
       return "Error: No image URL provided.";
     }
+
+    // Get the generated prompt from script properties to add to slide notes
+    const scriptProperties = PropertiesService.getScriptProperties();
+    const generatedPrompt =
+      scriptProperties.getProperty("CURRENT_PROMPT") || "";
 
     const presentation = SlidesApp.getActivePresentation();
     const currentSelection = presentation.getSelection();
@@ -596,6 +602,16 @@ function addImageToNewSlideFromUrl(imageUrl) {
     image.setLeft(left);
     image.setTop(top);
     // --- End of centering and scaling ---
+
+    // Add the prompt to the slide notes if available
+    if (generatedPrompt) {
+      newSlide
+        .getNotesPage()
+        .getSpeakerNotesShape()
+        .getText()
+        .setText(generatedPrompt);
+      console.log("Added generated prompt to slide notes");
+    }
 
     console.log(
       "Image inserted and resized in new slide: " +
@@ -720,4 +736,30 @@ function getStoredImageUrls() {
  */
 function include(filename) {
   return HtmlService.createHtmlOutputFromFile(filename).getContent();
+}
+
+/**
+ * Stores the current prompt in script properties for later use in slide notes.
+ *
+ * @param {string} prompt The prompt to store
+ * @return {boolean} True if successful
+ */
+function storeCurrentPrompt(prompt) {
+  try {
+    if (!prompt) {
+      console.warn("storeCurrentPrompt called with empty prompt");
+      return false;
+    }
+
+    const scriptProperties = PropertiesService.getScriptProperties();
+    scriptProperties.setProperty("CURRENT_PROMPT", prompt);
+    console.log(
+      "Current prompt stored for slide notes:",
+      prompt.substring(0, 50) + "..."
+    );
+    return true;
+  } catch (e) {
+    console.error("Error storing current prompt:", e);
+    return false;
+  }
 }

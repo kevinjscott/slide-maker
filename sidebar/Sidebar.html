@@ -43,7 +43,8 @@
       border: 1px solid #ccc;
       border-radius: 4px;
       box-sizing: border-box;
-      font-size: 13px;
+      font-size: 12px;
+      font-family: 'Roboto', Arial, sans-serif;
     }
     .flex-container {
       display: flex;
@@ -167,17 +168,17 @@
 <body>
   <div class="container">
     <button id="configToggle" class="config-toggle">
-      <span id="toggleIcon" class="toggle-icon">▶</span> API Configuration
+      <span id="toggleIcon" class="toggle-icon">▶</span> Configuration
     </button>
     
     <div id="configSection" class="config-section">
       <div class="form-group">
         <label for="groqKey">Groq API Key:</label>
-        <input type="password" id="groqKey" name="groqKey">
+        <input type="password" id="groqKey" name="groqKey" style="height: 30px;">
       </div>
       <div class="form-group">
         <label for="ideogramKey">Ideogram API Key:</label>
-        <input type="password" id="ideogramKey" name="ideogramKey">
+        <input type="password" id="ideogramKey" name="ideogramKey" style="height: 30px;">
       </div>
       <button onclick="saveKeys()">Save Keys</button>
     </div>
@@ -186,7 +187,7 @@
       <div class="form-group initial-prompt-container">
         <label for="initial_prompt">Initial Prompt:</label>
         <div class="textarea-wrapper">
-          <textarea id="initial_prompt" name="initial_prompt" rows="9"></textarea>
+          <textarea id="initial_prompt" name="initial_prompt" rows="10"></textarea>
           <button type="button" id="reset-button" title="Reset to Default" aria-label="Reset to Default">
             🔄
           </button>
@@ -195,12 +196,12 @@
 
       <div class="form-group">
         <label for="new_topic">New Topic:</label>
-        <textarea name="new_topic" id="new_topic" rows="3"></textarea>
+        <textarea name="new_topic" id="new_topic" rows="5"></textarea>
       </div>
 
       <div class="form-group">
         <label for="new_prompt">Generated Prompt:</label>
-        <textarea name="new_prompt" id="new_prompt" class="new-prompt" rows="9"></textarea>
+        <textarea name="new_prompt" id="new_prompt" class="new-prompt" rows="10"></textarea>
       </div>
       
       <button type="submit" class="button generate-button">Generate Images <span class="shortcut-hint">(⌘+Enter)</span></button>
@@ -350,22 +351,50 @@
       showSpinner(true);
       setStatus(`Generating ${numImages} images...`, false);
 
+      // Store the current prompt in script properties for later use
       google.script.run
-        .withSuccessHandler(response => {
-          showSpinner(false);
+        .withSuccessHandler(() => {
+          console.log("Prompt stored for slide notes");
           
-          if (response && response.ideogramImageUrls && response.ideogramImageUrls.length > 0) {
-            setStatus(`${response.ideogramImageUrls.length} images generated. Choose an image to add to slides.`, false);
-          } else {
-            setStatus(response.statusMessage || "Image generation complete.", false);
-          }
+          // After storing prompt, generate images
+          google.script.run
+            .withSuccessHandler(response => {
+              showSpinner(false);
+              
+              if (response && response.ideogramImageUrls && response.ideogramImageUrls.length > 0) {
+                setStatus(`${response.ideogramImageUrls.length} images generated. Choose an image to add to slides.`, false);
+              } else {
+                setStatus(response.statusMessage || "Image generation complete.", false);
+              }
+            })
+            .withFailureHandler(error => {
+              showSpinner(false);
+              setStatus("Error generating images: " + error.message, true);
+              console.error("Error generating images: ", error);
+            })
+            .generateSlideContent(newPrompt);
         })
         .withFailureHandler(error => {
-          showSpinner(false);
-          setStatus("Error generating images: " + error.message, true);
-          console.error("Error generating images: ", error);
+          console.error("Error storing prompt: ", error);
+          // Continue with image generation even if storing prompt fails
+          google.script.run
+            .withSuccessHandler(response => {
+              showSpinner(false);
+              
+              if (response && response.ideogramImageUrls && response.ideogramImageUrls.length > 0) {
+                setStatus(`${response.ideogramImageUrls.length} images generated. Choose an image to add to slides.`, false);
+              } else {
+                setStatus(response.statusMessage || "Image generation complete.", false);
+              }
+            })
+            .withFailureHandler(error => {
+              showSpinner(false);
+              setStatus("Error generating images: " + error.message, true);
+              console.error("Error generating images: ", error);
+            })
+            .generateSlideContent(newPrompt);
         })
-        .generateSlideContent(newPrompt);
+        .storeCurrentPrompt(newPrompt);
     }
     
     function setupKeyboardShortcuts() {
