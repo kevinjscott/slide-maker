@@ -9,10 +9,11 @@
     "https://www.googleapis.com/auth/script.external_request",
     "https://www.googleapis.com/auth/drive.file"
   ],
+  "urlFetchWhitelist": ["https://api.groq.com/", "https://api.ideogram.ai/"],
   "addOns": {
     "common": {
       "name": "Slide Maker AI",
-      "logoUrl": "https://logo.clearbit.com/pgatour.com",
+      "logoUrl": "https://placehold.co/120x120/fff/00a/png?text=AI",
       "layoutProperties": {
         "primaryColor": "#2772db",
         "secondaryColor": "#fefefe"
