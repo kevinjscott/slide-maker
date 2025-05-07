@@ -487,29 +487,33 @@ function addImageToNewSlideFromUrl(imageUrl) {
     const presentation = SlidesApp.getActivePresentation();
     const currentSelection = presentation.getSelection();
     let insertionIndex = 0;
+    let slideToSelect = null;
 
     if (currentSelection) {
       const currentPage = currentSelection.getCurrentPage();
       if (currentPage) {
         const slides = presentation.getSlides();
-        // Find the index of the current slide
         insertionIndex = slides.indexOf(currentPage);
         if (insertionIndex >= 0) {
-          // Increment the index to insert AFTER the current slide
-          insertionIndex++;
+          insertionIndex++; // Insert AFTER the current slide
         } else {
-          insertionIndex = slides.length; // Default to end if not found
+          insertionIndex = slides.length; // Default to end if current slide not found
+          console.warn(
+            "Current slide not found in presentation, appending to end."
+          );
         }
       } else {
         // No specific page selected, default to end
         insertionIndex = presentation.getSlides().length;
+        console.log("No current page selected, appending to end.");
       }
     } else {
       // No selection, default to end
       insertionIndex = presentation.getSlides().length;
+      console.log("No selection, appending to end.");
     }
 
-    console.log("Inserting new slide at index:", insertionIndex);
+    console.log("Attempting to insert new slide at index:", insertionIndex);
 
     // Insert a new slide at the determined index
     const newSlide = presentation.insertSlide(insertionIndex);
@@ -521,33 +525,52 @@ function addImageToNewSlideFromUrl(imageUrl) {
     // Insert the image
     const image = newSlide.insertImage(imageUrl);
 
-    try {
-      // Try multiple methods to ensure the slide is selected
+    // --- Center and scale image to fit slide ---
+    const imgWidth = image.getWidth();
+    const imgHeight = image.getHeight();
 
-      // Method 1: Use the slide's direct select method
-      newSlide.selectAsCurrentPage();
+    // Calculate aspect ratios
+    const slideAspectRatio = slideWidth / slideHeight;
+    const imageAspectRatio = imgWidth / imgHeight;
 
-      // Method 2: Use the presentation selection object
-      const selection = SlidesApp.getActivePresentation().getSelection();
-      selection.selectPage(newSlide);
+    let newImgWidth;
+    let newImgHeight;
 
-      console.log("Slide selection attempted using multiple methods");
-    } catch (selectionError) {
-      console.error("Error while trying to select the slide:", selectionError);
-      // Continue execution even if selection fails
+    if (imageAspectRatio > slideAspectRatio) {
+      // Image is wider than slide, so fit to width
+      newImgWidth = slideWidth;
+      newImgHeight = slideWidth / imageAspectRatio;
+    } else {
+      // Image is taller than slide, so fit to height
+      newImgHeight = slideHeight;
+      newImgWidth = slideHeight * imageAspectRatio;
     }
 
+    image.setWidth(newImgWidth);
+    image.setHeight(newImgHeight);
+
+    // Center the image
+    const left = (slideWidth - newImgWidth) / 2;
+    const top = (slideHeight - newImgHeight) / 2;
+    image.setLeft(left);
+    image.setTop(top);
+    // --- End of centering and scaling ---
+
     console.log(
-      "Image inserted into new slide: " +
+      "Image inserted and resized in new slide: " +
         newSlide.getObjectId() +
         ", Image ID: " +
         image.getObjectId()
     );
 
-    return "Image successfully added to a new slide.";
+    // Select the new slide
+    newSlide.selectAsCurrentPage();
+    console.log("New slide selected:", newSlide.getObjectId());
+
+    return "Image successfully added to a new slide and selected.";
   } catch (e) {
     console.error("Error in addImageToNewSlideFromUrl:", e);
-    SlidesApp.getUi().alert("Could not add image to new slide: " + e.message);
+    SlidesApp.getUi().alert("Error adding image: " + e.message); // Show error to user
     return "Error adding image to new slide: " + e.message;
   }
 }

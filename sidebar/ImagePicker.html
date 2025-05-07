@@ -30,6 +30,8 @@
       align-items: center;
       justify-content: center;
       padding: 10px;
+      height: calc(100vh - 60px);
+      box-sizing: border-box;
     }
     .image-container {
       position: relative;
@@ -38,7 +40,6 @@
       align-items: center;
       width: 100%;
       height: 100%;
-      max-height: calc(100vh - 120px);
     }
     .image-container img {
       max-width: 100%;
@@ -183,18 +184,6 @@
       <!-- Status message container -->
       <div id="statusMessage" class="status-message" style="display: none;"></div>
     </div>
-    
-    <div class="controls">
-      <div class="nav-controls">
-        <button id="prevButton" class="nav-button">← Previous</button>
-        <span id="imageCounter" class="image-counter">Image 1 of 8</span>
-        <button id="nextButton" class="nav-button">Next →</button>
-      </div>
-      <div class="action-buttons">
-        <button id="cancelButton" class="nav-button">Cancel (Esc)</button>
-        <button id="selectButton" class="nav-button">Add to Slides (Enter)</button>
-      </div>
-    </div>
   </div>
 
   <script>
@@ -211,13 +200,9 @@
       document.body.setAttribute('tabindex', '-1');
       document.body.focus();
       
-      // Set up event listeners
+      // Set up event listeners for arrows
       document.getElementById("prevArrow").addEventListener("click", navigateToPrevious);
       document.getElementById("nextArrow").addEventListener("click", navigateToNext);
-      document.getElementById("prevButton").addEventListener("click", navigateToPrevious);
-      document.getElementById("nextButton").addEventListener("click", navigateToNext);
-      document.getElementById("selectButton").addEventListener("click", selectCurrentImage);
-      document.getElementById("cancelButton").addEventListener("click", cancelSelection);
       
       // Set up keyboard navigation
       document.addEventListener("keydown", handleKeyPress);
@@ -243,7 +228,6 @@
             
             // Load the first image
             displayCurrentImage();
-            updateImageCounter();
           } else {
             showError("No images were received from the server.");
           }
@@ -320,12 +304,6 @@
       console.log("Displaying image at index:", currentIndex);
     }
     
-    // Update the image counter text
-    function updateImageCounter() {
-      const counter = document.getElementById("imageCounter");
-      counter.textContent = `Image ${currentIndex + 1} of ${imageUrls.length}`;
-    }
-    
     // Navigate to the previous image
     function navigateToPrevious() {
       if (imageUrls.length <= 1) return;
@@ -333,7 +311,6 @@
       currentIndex = (currentIndex - 1 + imageUrls.length) % imageUrls.length;
       console.log("Navigating to previous image, new index:", currentIndex);
       displayCurrentImage();
-      updateImageCounter();
     }
     
     // Navigate to the next image
@@ -343,7 +320,6 @@
       currentIndex = (currentIndex + 1) % imageUrls.length;
       console.log("Navigating to next image, new index:", currentIndex);
       displayCurrentImage();
-      updateImageCounter();
     }
     
     // Handle keyboard navigation
