@@ -407,10 +407,31 @@ function generateNewPrompt(initialPrompt, newTopic) {
       {
         role: "user",
         content:
-          "Create a prompt using the template, but make it about a different topic. Keep the style aspects EXACTLY the same! Anything inside {} is an instruction on how to vary the prompt, not part of the prompt itself, so don't include it.\n\n<template>" +
+          `
+Create a prompt using the template, but make it about the given topic. Keep the style and punctuation EXACTLY the same! Anything inside {} is an instruction on how to vary the prompt, not part of the prompt itself, so don't include it.
+
+<example>
+<template>A flat 3d simple graphical illustration (to be used as a full-screen PowerPoint slide) with a mellow, modern style containing {list items or describe the scene}. Contains these large texts: "{list key concepts, max 4 words each}" with the emphasis on "{one of the texts}". Use bold fonts for the text lettering.</template>
+<topic>Golden Retrievers make excellent pets</topic>
+<response>
+A flat 3d simple graphical illustration (to be used as a full-screen PowerPoint slide) with a mellow, modern style containing happy Golden Retrievers playing. Contains these large texts: "Golden Retriever", "Loyal Family Dogs", "Easy To Train", "Faithful Companions" with the emphasis on "Golden Retriever". Use bold fonts for the text lettering.
+</response>
+</example>
+
+<example>
+<template>A flat 3d simple graphical illustration (to be used as a full-screen PowerPoint slide) with a mellow, modern style containing {list items or describe the scene}. Contains these large texts: "{list key concepts, max 4 words each}" with the emphasis on "{one of the texts}". Use bold fonts for the text lettering.</template>
+<topic>Summit County is a great place to visit in the summer</topic>
+<response>
+A flat 3d simple graphical illustration (to be used as a full-screen PowerPoint slide) with a mellow, modern style containing mountains, lakes, and hiking trails. Contains these large texts: "Summer Vacation", "Mountain Scenery", "Summit County" with the emphasis on "Summit County". Use bold fonts for the text lettering.</response>
+</example>
+
+<template>` +
           initialPrompt +
-          "</template>\n\nNew Topic: " +
-          newTopic,
+          `</template>
+<topic>` +
+          newTopic +
+          `</topic>
+`,
       },
     ];
 
@@ -884,5 +905,168 @@ A isometric flat design (to be used as a full-screen PowerPoint slide) with a cl
   } catch (e) {
     console.error("Error generating new template:", e);
     return "Failed to generate new template. Please try again.";
+  }
+}
+
+/**
+ * Saves a user's prompt template with a name
+ * @param {string} templateName The name of the template
+ * @param {string} templateText The prompt template text to save
+ * @return {Object} Status of the operation
+ */
+function saveUserPromptTemplate(templateName, templateText) {
+  try {
+    if (!templateName || !templateText) {
+      return { success: false, message: "Template name and text are required" };
+    }
+
+    const userProperties = PropertiesService.getUserProperties();
+
+    // Get existing templates
+    let templates = {};
+    const savedTemplates = userProperties.getProperty("USER_PROMPT_TEMPLATES");
+    if (savedTemplates) {
+      templates = JSON.parse(savedTemplates);
+    }
+
+    // Add or update the template
+    templates[templateName] = templateText;
+
+    // Save back to user properties
+    userProperties.setProperty(
+      "USER_PROMPT_TEMPLATES",
+      JSON.stringify(templates)
+    );
+
+    console.log("Saved user template: " + templateName);
+    return {
+      success: true,
+      message: "Template saved successfully",
+      templates: getUserPromptTemplates().templates,
+    };
+  } catch (e) {
+    console.error("Error saving user template:", e);
+    return { success: false, message: "Error saving template: " + e.message };
+  }
+}
+
+/**
+ * Gets all user's saved prompt templates
+ * @return {Object} Object containing success status and templates
+ */
+function getUserPromptTemplates() {
+  try {
+    const userProperties = PropertiesService.getUserProperties();
+    const savedTemplates = userProperties.getProperty("USER_PROMPT_TEMPLATES");
+
+    if (savedTemplates) {
+      return {
+        success: true,
+        templates: JSON.parse(savedTemplates),
+      };
+    }
+
+    return { success: true, templates: {} };
+  } catch (e) {
+    console.error("Error retrieving user templates:", e);
+    return {
+      success: false,
+      message: "Error retrieving templates: " + e.message,
+      templates: {},
+    };
+  }
+}
+
+/**
+ * Deletes a user's prompt template
+ * @param {string} templateName The name of the template to delete
+ * @return {Object} Status of the operation
+ */
+function deleteUserPromptTemplate(templateName) {
+  try {
+    if (!templateName) {
+      return { success: false, message: "Template name is required" };
+    }
+
+    const userProperties = PropertiesService.getUserProperties();
+    const savedTemplates = userProperties.getProperty("USER_PROMPT_TEMPLATES");
+
+    if (!savedTemplates) {
+      return { success: false, message: "No templates found" };
+    }
+
+    let templates = JSON.parse(savedTemplates);
+
+    if (!templates[templateName]) {
+      return { success: false, message: "Template not found" };
+    }
+
+    // Delete the template
+    delete templates[templateName];
+
+    // Save back to user properties
+    userProperties.setProperty(
+      "USER_PROMPT_TEMPLATES",
+      JSON.stringify(templates)
+    );
+
+    console.log("Deleted user template: " + templateName);
+    return {
+      success: true,
+      message: "Template deleted successfully",
+      templates: templates,
+    };
+  } catch (e) {
+    console.error("Error deleting user template:", e);
+    return { success: false, message: "Error deleting template: " + e.message };
+  }
+}
+
+/**
+ * Saves the last used template to user properties
+ * @param {string} templateText The current template text to save
+ * @return {Object} Status of the operation
+ */
+function saveLastUsedTemplate(templateText) {
+  try {
+    if (!templateText) {
+      return { success: false, message: "Template text is required" };
+    }
+
+    const userProperties = PropertiesService.getUserProperties();
+    userProperties.setProperty("LAST_USED_TEMPLATE", templateText);
+
+    console.log("Saved last used template");
+    return { success: true, message: "Last used template saved" };
+  } catch (e) {
+    console.error("Error saving last used template:", e);
+    return { success: false, message: "Error saving template: " + e.message };
+  }
+}
+
+/**
+ * Gets the last used template from user properties
+ * @return {Object} Status and the template text
+ */
+function getLastUsedTemplate() {
+  try {
+    const userProperties = PropertiesService.getUserProperties();
+    const lastTemplate = userProperties.getProperty("LAST_USED_TEMPLATE");
+
+    if (lastTemplate) {
+      return {
+        success: true,
+        template: lastTemplate,
+      };
+    }
+
+    return { success: true, template: null };
+  } catch (e) {
+    console.error("Error retrieving last used template:", e);
+    return {
+      success: false,
+      message: "Error retrieving last template: " + e.message,
+      template: null,
+    };
   }
 }

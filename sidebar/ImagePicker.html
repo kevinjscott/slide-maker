@@ -279,10 +279,10 @@
       img.style.display = "none"; // Hide until loaded
       
       // Preload the next image for faster navigation
-      if (currentIndex < imageUrls.length - 1) {
-        const nextImg = new Image();
-        nextImg.src = imageUrls[currentIndex + 1];
-      }
+      // if (currentIndex < imageUrls.length - 1) {
+      //   const nextImg = new Image();
+      //   nextImg.src = imageUrls[currentIndex + 1];
+      // }
       
       img.onload = function() {
         // Hide loading indicators, show image

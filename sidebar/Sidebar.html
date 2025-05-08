@@ -48,7 +48,7 @@
       border: 1px solid #ccc;
       border-radius: 4px;
       box-sizing: border-box;
-      font-size: 12px;
+      font-size: 14px;
       font-family: 'Roboto', Arial, sans-serif;
     }
     .flex-container {
@@ -77,7 +77,7 @@
       padding: 10px 15px;
       width: 100%;
     }
-    #reset-button, #generate-template-button {
+    #reset-button, #generate-template-button, #save-template-button, #templates-button {
       background: none;
       border: none;
       color: #666;
@@ -92,7 +92,7 @@
       justify-content: center;
       border-radius: 4px;
     }
-    #reset-button:hover, #generate-template-button:hover {
+    #reset-button:hover, #generate-template-button:hover, #save-template-button:hover, #templates-button:hover {
       color: #2772db;
       background-color: rgba(39, 114, 219, 0.1);
     }
@@ -129,21 +129,108 @@
       border-top: 1px solid #ddd;
       margin: 15px 0;
     }
+    .templates-dropdown {
+      position: absolute;
+      top: 100%;
+      right: 0;
+      background-color: white;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+      z-index: 100;
+      min-width: 200px;
+      max-height: 300px;
+      overflow-y: auto;
+      display: none;
+    }
+    .templates-dropdown.active {
+      display: block;
+    }
+    .template-item {
+      padding: 8px 12px;
+      border-bottom: 1px solid #eee;
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .template-item:hover {
+      background-color: #f5f5f5;
+    }
+    .template-item:last-child {
+      border-bottom: none;
+    }
+    .delete-template {
+      color: #ff4c4c;
+      font-size: 14px;
+      margin-left: 8px;
+    }
+    .save-template-modal {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: rgba(0,0,0,0.5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      display: none;
+    }
+    .save-template-modal.active {
+      display: flex;
+    }
+    .modal-content {
+      background-color: white;
+      padding: 20px;
+      border-radius: 8px;
+      width: 80%;
+      max-width: 400px;
+    }
+    .modal-buttons {
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+      margin-top: 15px;
+    }
+    .secondary-button {
+      background-color: #f1f1f1;
+      color: #333;
+    }
+    .secondary-button:hover {
+      background-color: #e5e5e5;
+    }
+    .empty-templates {
+      padding: 12px;
+      color: #666;
+      font-style: italic;
+      text-align: center;
+    }
   </style>
 </head>
 <body>
   <div class="container">
     <form id="promptForm" onsubmit="submitForm(event)">
       <div class="form-group initial-prompt-container">
-        <label for="initial_prompt">Prompt Template:</label>
-        <div class="template-buttons">
-          <button type="button" id="generate-template-button" title="Generate New Template" aria-label="Generate New Template">
-            ✨
-          </button>
-          <button type="button" id="reset-button" title="Reset to Default" aria-label="Reset to Default">
-            🔄
-          </button>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+          <label for="initial_prompt">Prompt Template:</label>
+          <div class="template-buttons">
+            <button type="button" id="save-template-button" title="Save Template" aria-label="Save Template">
+              💾
+            </button>
+            <button type="button" id="templates-button" title="My Templates" aria-label="My Templates">
+              📋
+            </button>
+            <button type="button" id="generate-template-button" title="Generate New Template" aria-label="Generate New Template">
+              ✨
+            </button>
+            <button type="button" id="reset-button" title="Reset to Default" aria-label="Reset to Default">
+              🔄
+            </button>
+          </div>
         </div>
+        <div class="templates-dropdown" id="templates-dropdown"></div>
         <div class="textarea-wrapper">
           <textarea id="initial_prompt" name="initial_prompt" rows="10"></textarea>
         </div>
@@ -155,7 +242,7 @@
       </div>
 
       <div class="form-group">
-        <label for="new_prompt">Generated Prompt:</label>
+        <label for="new_prompt">Your Image Prompt:</label>
         <textarea name="new_prompt" id="new_prompt" class="new-prompt" rows="10"></textarea>
       </div>
       
@@ -164,6 +251,21 @@
     
     <div id="status"></div>
     <div id="spinner" class="spinner"></div>
+    
+    <!-- Save Template Modal -->
+    <div class="save-template-modal" id="save-template-modal">
+      <div class="modal-content">
+        <h2>Save Template</h2>
+        <div class="form-group">
+          <label for="template-name">Template Name:</label>
+          <input type="text" id="template-name" placeholder="Enter template name">
+        </div>
+        <div class="modal-buttons">
+          <button class="button secondary-button" id="cancel-save-template">Cancel</button>
+          <button class="button" id="confirm-save-template">Save</button>
+        </div>
+      </div>
+    </div>
   </div>
 
   <script>
@@ -171,15 +273,35 @@
     const DEFAULT_INITIAL_PROMPT = 'A flat 3d simple graphical illustration (to be used as a full-screen PowerPoint slide) with a fun, modern style containing {list items or describe the scene}. Contains these large texts: "{list items if any, max 4 words each}" with the emphasis on "{one of the texts}". Use bold fonts for the text lettering.';
     let typingTimer;
     const doneTypingInterval = 300; // milliseconds
+    let userTemplates = {};
     
     function initialize() {
+      // Load default template initially (will be overridden if last used template exists)
       document.getElementById("initial_prompt").value = DEFAULT_INITIAL_PROMPT;
       
       // Add event listeners
       document.getElementById("initial_prompt").addEventListener("input", onInputChange);
+      document.getElementById("initial_prompt").addEventListener("blur", saveCurrentTemplate);
       document.getElementById("new_topic").addEventListener("input", onInputChange);
       document.getElementById("reset-button").addEventListener("click", resetToDefault);
       document.getElementById("generate-template-button").addEventListener("click", generateNewTemplate);
+      document.getElementById("save-template-button").addEventListener("click", openSaveTemplateModal);
+      document.getElementById("templates-button").addEventListener("click", toggleTemplatesDropdown);
+      document.getElementById("cancel-save-template").addEventListener("click", closeSaveTemplateModal);
+      document.getElementById("confirm-save-template").addEventListener("click", saveTemplate);
+      
+      // Close dropdown when clicking outside
+      document.addEventListener("click", function(event) {
+        if (!event.target.closest("#templates-button") && !event.target.closest("#templates-dropdown")) {
+          document.getElementById("templates-dropdown").classList.remove("active");
+        }
+      });
+      
+      // Load user templates
+      loadUserTemplates();
+      
+      // Load last used template (if any)
+      loadLastUsedTemplate();
       
       // Set focus to new_topic field
       document.getElementById("new_topic").focus();
@@ -209,6 +331,7 @@
     function resetToDefault() {
       document.getElementById("initial_prompt").value = DEFAULT_INITIAL_PROMPT;
       setStatus("Prompt template reset to default.", false);
+      saveCurrentTemplate();
       updateNewPrompt();
     }
     
@@ -225,6 +348,7 @@
           } else {
             document.getElementById("initial_prompt").value = response;
             setStatus("New prompt template generated.", false);
+            saveCurrentTemplate();
             // Update the generated prompt based on the new template
             updateNewPrompt();
           }
@@ -343,6 +467,186 @@
           submitForm(event);
         }
       });
+    }
+    
+    // Template management functions
+    function loadUserTemplates() {
+      showSpinner(true);
+      
+      google.script.run
+        .withSuccessHandler(response => {
+          showSpinner(false);
+          
+          if (response.success) {
+            userTemplates = response.templates;
+            updateTemplatesDropdown();
+          } else {
+            setStatus("Error loading templates: " + response.message, true);
+          }
+        })
+        .withFailureHandler(error => {
+          showSpinner(false);
+          setStatus("Error loading templates: " + error.message, true);
+          console.error("Error loading templates: ", error);
+        })
+        .getUserPromptTemplates();
+    }
+    
+    function updateTemplatesDropdown() {
+      const dropdown = document.getElementById("templates-dropdown");
+      dropdown.innerHTML = "";
+      
+      if (Object.keys(userTemplates).length === 0) {
+        const emptyMessage = document.createElement("div");
+        emptyMessage.className = "empty-templates";
+        emptyMessage.textContent = "No saved templates";
+        dropdown.appendChild(emptyMessage);
+        return;
+      }
+      
+      for (const [name, template] of Object.entries(userTemplates)) {
+        const item = document.createElement("div");
+        item.className = "template-item";
+        
+        const templateName = document.createElement("span");
+        templateName.textContent = name;
+        templateName.style.flex = "1";
+        templateName.style.cursor = "pointer";
+        templateName.onclick = () => {
+          document.getElementById("initial_prompt").value = template;
+          dropdown.classList.remove("active");
+          saveCurrentTemplate();
+          updateNewPrompt();
+          setStatus(`Template "${name}" loaded`, false);
+        };
+        
+        const deleteButton = document.createElement("span");
+        deleteButton.className = "delete-template";
+        deleteButton.textContent = "✕";
+        deleteButton.title = "Delete template";
+        deleteButton.onclick = (e) => {
+          e.stopPropagation();
+          deleteTemplate(name);
+        };
+        
+        item.appendChild(templateName);
+        item.appendChild(deleteButton);
+        dropdown.appendChild(item);
+      }
+    }
+    
+    function toggleTemplatesDropdown() {
+      const dropdown = document.getElementById("templates-dropdown");
+      dropdown.classList.toggle("active");
+    }
+    
+    function openSaveTemplateModal() {
+      document.getElementById("template-name").value = "";
+      document.getElementById("save-template-modal").classList.add("active");
+    }
+    
+    function closeSaveTemplateModal() {
+      document.getElementById("save-template-modal").classList.remove("active");
+    }
+    
+    function saveTemplate() {
+      const templateName = document.getElementById("template-name").value.trim();
+      const templateText = document.getElementById("initial_prompt").value.trim();
+      
+      if (!templateName) {
+        setStatus("Please enter a template name", true);
+        return;
+      }
+      
+      if (!templateText) {
+        setStatus("Template cannot be empty", true);
+        return;
+      }
+      
+      showSpinner(true);
+      setStatus("Saving template...", false);
+      
+      google.script.run
+        .withSuccessHandler(response => {
+          showSpinner(false);
+          
+          if (response.success) {
+            userTemplates = response.templates;
+            updateTemplatesDropdown();
+            closeSaveTemplateModal();
+            setStatus(`Template "${templateName}" saved successfully`, false);
+          } else {
+            setStatus("Error saving template: " + response.message, true);
+          }
+        })
+        .withFailureHandler(error => {
+          showSpinner(false);
+          setStatus("Error saving template: " + error.message, true);
+          console.error("Error saving template: ", error);
+        })
+        .saveUserPromptTemplate(templateName, templateText);
+    }
+    
+    function deleteTemplate(templateName) {
+      if (!confirm(`Are you sure you want to delete the template "${templateName}"?`)) {
+        return;
+      }
+      
+      showSpinner(true);
+      setStatus(`Deleting template "${templateName}"...`, false);
+      
+      google.script.run
+        .withSuccessHandler(response => {
+          showSpinner(false);
+          
+          if (response.success) {
+            userTemplates = response.templates;
+            updateTemplatesDropdown();
+            setStatus(`Template "${templateName}" deleted successfully`, false);
+          } else {
+            setStatus("Error deleting template: " + response.message, true);
+          }
+        })
+        .withFailureHandler(error => {
+          showSpinner(false);
+          setStatus("Error deleting template: " + error.message, true);
+          console.error("Error deleting template: ", error);
+        })
+        .deleteUserPromptTemplate(templateName);
+    }
+
+    function saveCurrentTemplate() {
+      const templateText = document.getElementById("initial_prompt").value.trim();
+      if (!templateText) return;
+      
+      google.script.run
+        .withSuccessHandler(response => {
+          // Quietly save without showing status messages to the user
+          if (!response.success) {
+            console.error("Error saving template state:", response.message);
+          }
+        })
+        .withFailureHandler(error => {
+          console.error("Error saving template state:", error.message);
+        })
+        .saveLastUsedTemplate(templateText);
+    }
+    
+    function loadLastUsedTemplate() {
+      google.script.run
+        .withSuccessHandler(response => {
+          if (response.success && response.template) {
+            document.getElementById("initial_prompt").value = response.template;
+            // If topic exists, update the generated prompt
+            if (document.getElementById("new_topic").value.trim()) {
+              updateNewPrompt();
+            }
+          }
+        })
+        .withFailureHandler(error => {
+          console.error("Error loading last template:", error.message);
+        })
+        .getLastUsedTemplate();
     }
 
     window.onload = initialize;
