@@ -1,3 +1,129 @@
+// Global Constants
+const IDEOGRAM_API_URL_V3 = "https://api.ideogram.ai/v1/ideogram-v3/generate";
+const GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions";
+
+const PROP_GROQ_API_KEY = "GROQ_API_KEY";
+const PROP_IDEOGRAM_API_KEY = "IDEOGRAM_API_KEY";
+const PROP_TEMP_IMAGE_URLS = "TEMP_IMAGE_URLS";
+const PROP_CURRENT_PROMPT = "CURRENT_PROMPT";
+const PROP_USER_PROMPT_TEMPLATES = "USER_PROMPT_TEMPLATES";
+const PROP_LAST_USED_TEMPLATE = "LAST_USED_TEMPLATE";
+const PROP_USER_AESTHETIC = "userAesthetic";
+const PROP_USER_VIBE = "userVibe";
+
+const DEFAULT_IDEOGRAM_ASPECT_RATIO = "16x9";
+const DEFAULT_IDEOGRAM_MAGIC_PROMPT = "OFF";
+const DEFAULT_IDEOGRAM_NEGATIVE_PROMPT =
+  "small text, chaotic, strange characters, nonsense, duplicate, ugly, mutation, disgusting, unrealistic";
+const DEFAULT_IDEOGRAM_RENDERING_SPEED = "TURBO";
+const GROQ_MODEL_DEFAULT = "llama-3.3-70b-versatile";
+
+const MAX_IMAGES_IDEOGRAM_V3 = 8;
+const MIN_IMAGES_IDEOGRAM_V3 = 1;
+
+// Helper Functions
+function _getScriptProperties() {
+  return PropertiesService.getScriptProperties();
+}
+
+function _getUserProperties() {
+  return PropertiesService.getUserProperties();
+}
+
+function _getApiKey(keyName) {
+  const scriptProps = _getScriptProperties();
+  const apiKey = scriptProps.getProperty(keyName);
+  if (!apiKey) {
+    console.error(keyName + " not set in script properties.");
+  }
+  return apiKey;
+}
+
+function _clampValue(value, min, max) {
+  return Math.max(min, Math.min(value, max));
+}
+
+function _makeGroqApiCall(messages, model, temperature, max_tokens) {
+  const groqApiKey = _getApiKey(PROP_GROQ_API_KEY);
+  if (!groqApiKey) {
+    return {
+      error:
+        PROP_GROQ_API_KEY + " not set. Please set it in script properties.",
+    };
+  }
+
+  try {
+    const groqPayload = {
+      messages: messages,
+      model: model || GROQ_MODEL_DEFAULT,
+      max_tokens: max_tokens || 1000,
+      temperature: temperature || 0.3, // Default temperature, can be overridden
+    };
+
+    console.log(
+      "Groq API payload:",
+      JSON.stringify(groqPayload).substring(0, 500) + "..."
+    );
+
+    const groqOptions = {
+      method: "post",
+      contentType: "application/json",
+      headers: {
+        Authorization: "Bearer " + groqApiKey,
+        "Content-Type": "application/json",
+      },
+      payload: JSON.stringify(groqPayload),
+      muteHttpExceptions: true,
+    };
+
+    console.log("Making Groq API request to: " + GROQ_API_URL);
+    const groqResponse = UrlFetchApp.fetch(GROQ_API_URL, groqOptions);
+    const groqResponseCode = groqResponse.getResponseCode();
+    const groqResponseBody = groqResponse.getContentText();
+
+    console.log("Groq API response code:", groqResponseCode);
+    console.log(
+      "Groq API response (first 100 chars):",
+      groqResponseBody.substring(0, 100) + "..."
+    );
+
+    if (groqResponseCode === 200) {
+      const groqResult = JSON.parse(groqResponseBody);
+      if (
+        groqResult.choices &&
+        groqResult.choices.length > 0 &&
+        groqResult.choices[0].message &&
+        groqResult.choices[0].message.content
+      ) {
+        return { success: groqResult.choices[0].message.content.trim() };
+      } else {
+        console.error(
+          "Failed to parse content from Groq response",
+          groqResponseBody.substring(0, 500)
+        );
+        return { error: "Failed to parse content from Groq response." };
+      }
+    } else {
+      console.error(
+        "Groq API error:",
+        groqResponseCode,
+        groqResponseBody.substring(0, 500)
+      );
+      return {
+        error:
+          "Groq API error: " +
+          groqResponseCode +
+          " - " +
+          groqResponseBody.substring(0, 100) +
+          "...",
+      };
+    }
+  } catch (e) {
+    console.error("Error in _makeGroqApiCall:", e);
+    return { error: "Exception during Groq API call: " + e.toString() };
+  }
+}
+
 function onInstall(e) {
   onOpen(e);
 }
@@ -66,25 +192,20 @@ function showSidebar() {
 function generateSlideContent(prompt) {
   console.log("generateSlideContent called with prompt:", prompt);
 
-  // Read API keys from script properties, not user properties
-  const scriptProperties = PropertiesService.getScriptProperties();
-  const groqApiKey = scriptProperties.getProperty("GROQ_API_KEY");
-  const ideogramApiKey = scriptProperties.getProperty("IDEOGRAM_API_KEY");
+  const ideogramApiKey = _getApiKey(PROP_IDEOGRAM_API_KEY);
 
   if (!ideogramApiKey) {
-    console.error("Ideogram API key not set.");
     return {
       ideogramImageUrls: [],
       statusMessage:
-        "Ideogram API key not set. Please set IDEOGRAM_API_KEY in script properties.",
+        PROP_IDEOGRAM_API_KEY + " not set. Please set it in script properties.",
     };
   }
 
   let statusMessage = "";
   let collectedImageUrls = [];
-  const num_images_to_request = 8; // Default to 8 images
+  const num_images_to_request = MAX_IMAGES_IDEOGRAM_V3; // Use constant, assuming always max for now
 
-  // --- Ideogram API Call for Image (Using V3 with Manual Multipart/form-data) ---
   try {
     console.log(
       "Attempting Ideogram API call (V3 for " +
@@ -92,33 +213,24 @@ function generateSlideContent(prompt) {
         " images)..."
     );
 
-    // Exact endpoint from utils.py
-    const ideogramApiUrl = "https://api.ideogram.ai/v1/ideogram-v3/generate";
+    const ideogramApiUrl = IDEOGRAM_API_URL_V3; // Use constant
 
-    // Validate and clamp num_images as done in utils.py
-    let num_images_clamped = num_images_to_request;
-    if (!(1 <= num_images_clamped && num_images_clamped <= 8)) {
-      console.log(
-        "Warning: num_images (" +
-          num_images_clamped +
-          ") is outside the Ideogram API v3 supported range of 1-8. Clamping to nearest valid value."
-      );
-      num_images_clamped = Math.max(1, Math.min(num_images_clamped, 8));
-    }
+    let num_images_clamped = _clampValue(
+      num_images_to_request,
+      MIN_IMAGES_IDEOGRAM_V3,
+      MAX_IMAGES_IDEOGRAM_V3
+    );
 
-    // Prepare multipart form data
     const boundary = "Boundary_" + new Date().getTime();
     let multipartRequestBody = "";
 
-    // Exact form fields used in utils.py
     const formFields = {
       prompt: prompt,
-      aspect_ratio: "16x9", // V3 uses values like "1x1", "16x9"
-      magic_prompt: "AUTO", // V3 valid values: "AUTO", "ON", "OFF"
-      negative_prompt:
-        "small text, chaotic, strange characters, nonsense, duplicate, ugly, mutation, disgusting, unrealistic",
-      num_images: String(num_images_clamped), // Must be string for multipart
-      rendering_speed: "DEFAULT", // V3 valid values: "TURBO", "DEFAULT", "QUALITY"
+      aspect_ratio: DEFAULT_IDEOGRAM_ASPECT_RATIO,
+      magic_prompt: DEFAULT_IDEOGRAM_MAGIC_PROMPT,
+      negative_prompt: DEFAULT_IDEOGRAM_NEGATIVE_PROMPT,
+      num_images: String(num_images_clamped),
+      rendering_speed: DEFAULT_IDEOGRAM_RENDERING_SPEED,
     };
 
     for (const key in formFields) {
@@ -128,7 +240,6 @@ function generateSlideContent(prompt) {
       multipartRequestBody += formFields[key] + "\r\n";
     }
 
-    // Color palette - exact same configuration as in utils.py
     const colorPaletteConfig = {
       members: [
         { color_hex: "#00205B", color_weight: 0.3 },
@@ -142,24 +253,21 @@ function generateSlideContent(prompt) {
     multipartRequestBody += "--" + boundary + "\r\n";
     multipartRequestBody +=
       'Content-Disposition: form-data; name="color_palette"\r\n';
-    multipartRequestBody += "Content-Type: application/json\r\n\r\n"; // Specify content type for this part
+    multipartRequestBody += "Content-Type: application/json\r\n\r\n";
     multipartRequestBody += JSON.stringify(colorPaletteConfig) + "\r\n";
 
-    // Closing boundary
     multipartRequestBody += "--" + boundary + "--\r\n";
 
-    // Exact headers from utils.py
     const ideogramOptions = {
       method: "post",
       contentType: "multipart/form-data; boundary=" + boundary,
       headers: {
-        "Api-Key": ideogramApiKey, // Matching the Python code's header name
+        "Api-Key": ideogramApiKey,
       },
-      payload: Utilities.newBlob(multipartRequestBody).getBytes(), // Convert to bytes
+      payload: Utilities.newBlob(multipartRequestBody).getBytes(),
       muteHttpExceptions: true,
     };
 
-    // For debugging
     console.log(
       "Ideogram V3 Request Headers:",
       JSON.stringify({
@@ -168,14 +276,12 @@ function generateSlideContent(prompt) {
       })
     );
 
-    // Make the request
     console.log("Sending request to Ideogram V3...");
     const ideogramResponse = UrlFetchApp.fetch(ideogramApiUrl, ideogramOptions);
     const ideogramResponseCode = ideogramResponse.getResponseCode();
     const ideogramResponseBody = ideogramResponse.getContentText();
     console.log("Ideogram V3 Response Code:", ideogramResponseCode);
 
-    // Parse response similar to utils.py
     if (ideogramResponseCode === 200) {
       try {
         const ideogramResult = JSON.parse(ideogramResponseBody);
@@ -184,11 +290,9 @@ function generateSlideContent(prompt) {
           JSON.stringify(ideogramResult).substring(0, 200) + "..."
         );
 
-        // Extract data array exactly like utils.py
         const generated_data = ideogramResult.data || [];
 
         if (generated_data && generated_data.length > 0) {
-          // Collect all URLs from the data array
           generated_data.forEach((item) => {
             if (item.url) {
               collectedImageUrls.push(item.url);
@@ -232,7 +336,6 @@ function generateSlideContent(prompt) {
         );
       }
     } else if (ideogramResponseCode === 202) {
-      // Handle 202 Accepted (async job)
       statusMessage +=
         "Ideogram request accepted (202). This is an asynchronous job. ";
       console.warn(
@@ -240,7 +343,6 @@ function generateSlideContent(prompt) {
         ideogramResponseBody.substring(0, 500)
       );
     } else {
-      // Handle error responses
       statusMessage +=
         "Ideogram API (V3) error (" + ideogramResponseCode + "). ";
       try {
@@ -268,11 +370,10 @@ function generateSlideContent(prompt) {
     collectedImageUrls.length
   );
 
-  // Store the image URLs in script properties for the image picker to access
   if (collectedImageUrls.length > 0) {
-    const scriptProperties = PropertiesService.getScriptProperties();
-    scriptProperties.setProperty(
-      "TEMP_IMAGE_URLS",
+    const scriptProps = _getScriptProperties();
+    scriptProps.setProperty(
+      PROP_TEMP_IMAGE_URLS, // Use constant
       JSON.stringify(collectedImageUrls)
     );
     console.log(
@@ -281,7 +382,6 @@ function generateSlideContent(prompt) {
       "image URLs in script properties"
     );
 
-    // Open the image picker dialog automatically
     showImagePickerDialog(collectedImageUrls);
   }
 
@@ -346,9 +446,13 @@ function insertImageToCurrentSlide(imageUrl) {
  */
 function saveApiKeys(groqKey, ideogramKey) {
   console.warn(
-    "saveApiKeys called, but this function is deprecated. Keys should be set directly in Script Properties."
+    "saveApiKeys function is deprecated. API keys should be set directly in Script Properties."
   );
-  return "API keys should be set directly in Script Properties.";
+  // Return a more informative message to the client if it somehow gets called.
+  return {
+    success: false,
+    message: "Deprecated: API keys must be configured in Script Properties.",
+  };
 }
 
 /**
@@ -362,24 +466,11 @@ function saveApiKeys(groqKey, ideogramKey) {
 function generateNewPrompt(initialPrompt, newTopic) {
   console.log("generateNewPrompt called with topic:", newTopic);
 
-  // Read Groq API key from script properties, not user properties
-  const scriptProperties = PropertiesService.getScriptProperties();
-  const groqApiKey = scriptProperties.getProperty("GROQ_API_KEY");
-
-  if (!groqApiKey) {
-    console.error("Groq API key not set.");
-    return "Groq API key not set. Please set GROQ_API_KEY in script properties.";
-  }
-
-  try {
-    console.log("Attempting Groq API call for new prompt generation...");
-    const groqApiUrl = "https://api.groq.com/openai/v1/chat/completions";
-
-    const groqMessages = [
-      {
-        role: "user",
-        content:
-          `
+  const groqMessages = [
+    {
+      role: "user",
+      content:
+        `
 Create a prompt using the template, but make it about the given topic. Keep the style and punctuation EXACTLY the same! Anything inside {} is an instruction on how to vary the prompt, not part of the prompt itself, so don't include it.
 
 <example>
@@ -398,79 +489,27 @@ A flat 3d simple graphical illustration (to be used as a full-screen PowerPoint 
 </example>
 
 <template>` +
-          initialPrompt +
-          `</template>
+        initialPrompt +
+        `</template>
 <topic>` +
-          newTopic +
-          `</topic>
-`,
-      },
-    ];
-
-    const groqPayload = {
-      messages: groqMessages,
-      model: "llama-3.3-70b-versatile", // Updated to match utils.py
-      max_tokens: 1000,
-      temperature: 0.3,
-    };
-
-    console.log("Groq API payload:", JSON.stringify(groqPayload));
-
-    const groqOptions = {
-      method: "post",
-      contentType: "application/json",
-      headers: {
-        Authorization: "Bearer " + groqApiKey,
-        "Content-Type": "application/json", // Explicitly set Content-Type
-      },
-      payload: JSON.stringify(groqPayload),
-      muteHttpExceptions: true,
-    };
-
-    console.log("Making Groq API request...");
-    const groqResponse = UrlFetchApp.fetch(groqApiUrl, groqOptions);
-    const groqResponseCode = groqResponse.getResponseCode();
-    const groqResponseBody = groqResponse.getContentText();
-
-    console.log("Groq API response code:", groqResponseCode);
-    console.log(
-      "Groq API response (first 100 chars):",
-      groqResponseBody.substring(0, 100)
-    );
-
-    if (groqResponseCode === 200) {
-      const groqResult = JSON.parse(groqResponseBody);
-      if (
-        groqResult.choices &&
-        groqResult.choices.length > 0 &&
-        groqResult.choices[0].message &&
-        groqResult.choices[0].message.content
-      ) {
-        const newPrompt = groqResult.choices[0].message.content.trim();
-        console.log(
-          "Generated new prompt (first 50 chars):",
-          newPrompt.substring(0, 50) + "..."
-        );
-        return newPrompt;
-      } else {
-        console.error("Failed to parse prompt from Groq response");
-        return (
-          "Failed to generate new prompt about " +
-          newTopic +
-          ". Please try again."
-        );
-      }
-    } else {
-      console.error("Groq API error:", groqResponseCode, groqResponseBody);
-      return (
-        "Failed to generate new prompt about " +
         newTopic +
-        ". Please try again."
-      );
-    }
-  } catch (e) {
-    console.error("Error generating new prompt:", e);
+        `</topic>
+`,
+    },
+  ];
+
+  const result = _makeGroqApiCall(groqMessages, GROQ_MODEL_DEFAULT, 0.3, 1000);
+
+  if (result.success) {
+    console.log(
+      "Generated new prompt (first 50 chars):",
+      result.success.substring(0, 50) + "..."
+    );
+    return result.success;
+  } else {
+    console.error("generateNewPrompt failed:", result.error);
     return (
+      result.error || // Prefer specific error from helper
       "Failed to generate new prompt about " + newTopic + ". Please try again."
     );
   }
@@ -683,14 +722,19 @@ function showImagePickerDialog(imageUrls) {
     );
 
     // Store the image URLs temporarily in script properties
-    const scriptProperties = PropertiesService.getScriptProperties();
-    scriptProperties.setProperty("TEMP_IMAGE_URLS", JSON.stringify(imageUrls));
-    console.log("Stored image URLs in script properties");
+    _getScriptProperties().setProperty(
+      PROP_TEMP_IMAGE_URLS,
+      JSON.stringify(imageUrls)
+    );
+    console.log(
+      "Stored image URLs in script properties using PROP_TEMP_IMAGE_URLS"
+    );
 
     // Create HTML output (not template)
     const htmlOutput = HtmlService.createHtmlOutputFromFile("ImagePicker")
       .setWidth(1000)
       .setHeight(600)
+      // Title remains hardcoded as it's specific to this dialog
       .setTitle("Select an Image");
 
     // Show the modal dialog
@@ -712,8 +756,8 @@ function showImagePickerDialog(imageUrls) {
  * @return {Array} Array of image URLs
  */
 function getStoredImageUrls() {
-  const scriptProperties = PropertiesService.getScriptProperties();
-  const storedUrls = scriptProperties.getProperty("TEMP_IMAGE_URLS");
+  const scriptProps = _getScriptProperties();
+  const storedUrls = scriptProps.getProperty(PROP_TEMP_IMAGE_URLS);
 
   console.log(
     "Retrieved stored image URLs:",
@@ -728,7 +772,6 @@ function getStoredImageUrls() {
       return [];
     }
   }
-
   return [];
 }
 
@@ -754,9 +797,7 @@ function storeCurrentPrompt(prompt) {
       console.warn("storeCurrentPrompt called with empty prompt");
       return false;
     }
-
-    const scriptProperties = PropertiesService.getScriptProperties();
-    scriptProperties.setProperty("CURRENT_PROMPT", prompt);
+    _getScriptProperties().setProperty(PROP_CURRENT_PROMPT, prompt);
     console.log(
       "Current prompt stored for slide notes:",
       prompt.substring(0, 50) + "..."
@@ -776,22 +817,7 @@ function storeCurrentPrompt(prompt) {
 function generateNewPromptTemplate() {
   console.log("generateNewPromptTemplate called");
 
-  // Read Groq API key from script properties
-  const scriptProperties = PropertiesService.getScriptProperties();
-  const groqApiKey = scriptProperties.getProperty("GROQ_API_KEY");
-
-  if (!groqApiKey) {
-    console.error("Groq API key not set.");
-    return "Groq API key not set. Please set GROQ_API_KEY in script properties.";
-  }
-
-  try {
-    console.log(
-      "Attempting Groq API call for new prompt template generation..."
-    );
-    const groqApiUrl = "https://api.groq.com/openai/v1/chat/completions";
-
-    const templateInstructions = `
+  const templateInstructions = `
 <template>
 A [flat 3d simple graphical illustration] (to be used as a full-screen PowerPoint slide) with a [fun, modern] style containing {list items or describe the scene}.
 
@@ -821,72 +847,25 @@ A flat 3d simple graphical illustration (to be used as a full-screen PowerPoint 
 
 `;
 
-    const groqMessages = [
-      {
-        role: "user",
-        content: templateInstructions,
-      },
-    ];
+  const groqMessages = [
+    {
+      role: "user",
+      content: templateInstructions,
+    },
+  ];
 
-    const groqPayload = {
-      messages: groqMessages,
-      model: "llama-3.3-70b-versatile",
-      max_tokens: 1000,
-      temperature: 1.2,
-    };
+  // Using a higher temperature for more varied template generation
+  const result = _makeGroqApiCall(groqMessages, GROQ_MODEL_DEFAULT, 1.2, 1000);
 
+  if (result.success) {
     console.log(
-      "Groq API payload for template generation:",
-      JSON.stringify(groqPayload)
+      "Generated new template (first 50 chars):",
+      result.success.substring(0, 50) + "..."
     );
-
-    const groqOptions = {
-      method: "post",
-      contentType: "application/json",
-      headers: {
-        Authorization: "Bearer " + groqApiKey,
-        "Content-Type": "application/json",
-      },
-      payload: JSON.stringify(groqPayload),
-      muteHttpExceptions: true,
-    };
-
-    console.log("Making Groq API request for template generation...");
-    const groqResponse = UrlFetchApp.fetch(groqApiUrl, groqOptions);
-    const groqResponseCode = groqResponse.getResponseCode();
-    const groqResponseBody = groqResponse.getContentText();
-
-    console.log("Groq API response code:", groqResponseCode);
-    console.log(
-      "Groq API response (first 100 chars):",
-      groqResponseBody.substring(0, 100)
-    );
-
-    if (groqResponseCode === 200) {
-      const groqResult = JSON.parse(groqResponseBody);
-      if (
-        groqResult.choices &&
-        groqResult.choices.length > 0 &&
-        groqResult.choices[0].message &&
-        groqResult.choices[0].message.content
-      ) {
-        const newTemplate = groqResult.choices[0].message.content.trim();
-        console.log(
-          "Generated new template (first 50 chars):",
-          newTemplate.substring(0, 50) + "..."
-        );
-        return newTemplate;
-      } else {
-        console.error("Failed to parse template from Groq response");
-        return "Failed to generate new template. Please try again.";
-      }
-    } else {
-      console.error("Groq API error:", groqResponseCode, groqResponseBody);
-      return "Failed to generate new template. Please try again.";
-    }
-  } catch (e) {
-    console.error("Error generating new template:", e);
-    return "Failed to generate new template. Please try again.";
+    return result.success;
+  } else {
+    console.error("generateNewPromptTemplate failed:", result.error);
+    return result.error || "Failed to generate new template. Please try again.";
   }
 }
 
@@ -902,29 +881,25 @@ function saveUserPromptTemplate(templateName, templateText) {
       return { success: false, message: "Template name and text are required" };
     }
 
-    const userProperties = PropertiesService.getUserProperties();
-
-    // Get existing templates
+    const userProps = _getUserProperties();
     let templates = {};
-    const savedTemplates = userProperties.getProperty("USER_PROMPT_TEMPLATES");
+    const savedTemplates = userProps.getProperty(PROP_USER_PROMPT_TEMPLATES);
     if (savedTemplates) {
       templates = JSON.parse(savedTemplates);
     }
 
-    // Add or update the template
     templates[templateName] = templateText;
-
-    // Save back to user properties
-    userProperties.setProperty(
-      "USER_PROMPT_TEMPLATES",
+    userProps.setProperty(
+      PROP_USER_PROMPT_TEMPLATES,
       JSON.stringify(templates)
     );
 
     console.log("Saved user template: " + templateName);
+    // Return all templates including the newly saved one, consistent with delete
     return {
       success: true,
       message: "Template saved successfully",
-      templates: getUserPromptTemplates().templates,
+      templates: templates,
     };
   } catch (e) {
     console.error("Error saving user template:", e);
@@ -938,8 +913,8 @@ function saveUserPromptTemplate(templateName, templateText) {
  */
 function getUserPromptTemplates() {
   try {
-    const userProperties = PropertiesService.getUserProperties();
-    const savedTemplates = userProperties.getProperty("USER_PROMPT_TEMPLATES");
+    const userProps = _getUserProperties();
+    const savedTemplates = userProps.getProperty(PROP_USER_PROMPT_TEMPLATES);
 
     if (savedTemplates) {
       return {
@@ -947,14 +922,13 @@ function getUserPromptTemplates() {
         templates: JSON.parse(savedTemplates),
       };
     }
-
-    return { success: true, templates: {} };
+    return { success: true, templates: {} }; // Return empty object if no templates
   } catch (e) {
     console.error("Error retrieving user templates:", e);
     return {
       success: false,
       message: "Error retrieving templates: " + e.message,
-      templates: {},
+      templates: {}, // Return empty object on error
     };
   }
 }
@@ -970,8 +944,8 @@ function deleteUserPromptTemplate(templateName) {
       return { success: false, message: "Template name is required" };
     }
 
-    const userProperties = PropertiesService.getUserProperties();
-    const savedTemplates = userProperties.getProperty("USER_PROMPT_TEMPLATES");
+    const userProps = _getUserProperties();
+    const savedTemplates = userProps.getProperty(PROP_USER_PROMPT_TEMPLATES);
 
     if (!savedTemplates) {
       return { success: false, message: "No templates found" };
@@ -983,12 +957,9 @@ function deleteUserPromptTemplate(templateName) {
       return { success: false, message: "Template not found" };
     }
 
-    // Delete the template
     delete templates[templateName];
-
-    // Save back to user properties
-    userProperties.setProperty(
-      "USER_PROMPT_TEMPLATES",
+    userProps.setProperty(
+      PROP_USER_PROMPT_TEMPLATES,
       JSON.stringify(templates)
     );
 
@@ -996,7 +967,7 @@ function deleteUserPromptTemplate(templateName) {
     return {
       success: true,
       message: "Template deleted successfully",
-      templates: templates,
+      templates: templates, // Return updated templates list
     };
   } catch (e) {
     console.error("Error deleting user template:", e);
@@ -1012,11 +983,16 @@ function deleteUserPromptTemplate(templateName) {
 function saveLastUsedTemplate(templateText) {
   try {
     if (!templateText) {
-      return { success: false, message: "Template text is required" };
+      // Allow saving an empty string to clear the last used template if needed
+      console.warn(
+        "saveLastUsedTemplate called with empty templateText. This will clear the last used template."
+      );
     }
 
-    const userProperties = PropertiesService.getUserProperties();
-    userProperties.setProperty("LAST_USED_TEMPLATE", templateText);
+    _getUserProperties().setProperty(
+      PROP_LAST_USED_TEMPLATE,
+      templateText || ""
+    );
 
     console.log("Saved last used template");
     return { success: true, message: "Last used template saved" };
@@ -1032,16 +1008,17 @@ function saveLastUsedTemplate(templateText) {
  */
 function getLastUsedTemplate() {
   try {
-    const userProperties = PropertiesService.getUserProperties();
-    const lastTemplate = userProperties.getProperty("LAST_USED_TEMPLATE");
+    const userProps = _getUserProperties();
+    const lastTemplate = userProps.getProperty(PROP_LAST_USED_TEMPLATE);
 
-    if (lastTemplate) {
+    // Explicitly check for null/undefined to distinguish from an empty string
+    if (lastTemplate !== null && lastTemplate !== undefined) {
       return {
         success: true,
         template: lastTemplate,
       };
     }
-
+    // If property doesn't exist or was explicitly null
     return { success: true, template: null };
   } catch (e) {
     console.error("Error retrieving last used template:", e);
@@ -1056,9 +1033,9 @@ function getLastUsedTemplate() {
 // Functions for persisting aesthetic and vibe
 function saveAestheticAndVibe(aesthetic, vibe) {
   try {
-    PropertiesService.getUserProperties().setProperties({
-      userAesthetic: aesthetic,
-      userVibe: vibe,
+    _getUserProperties().setProperties({
+      [PROP_USER_AESTHETIC]: aesthetic,
+      [PROP_USER_VIBE]: vibe,
     });
     return { success: true };
   } catch (e) {
@@ -1069,12 +1046,10 @@ function saveAestheticAndVibe(aesthetic, vibe) {
 
 function getAestheticAndVibe() {
   try {
-    const properties = PropertiesService.getUserProperties().getProperties();
-    const aestheticValue = properties["userAesthetic"];
-    const vibeValue = properties["userVibe"];
+    const properties = _getUserProperties().getProperties();
+    const aestheticValue = properties[PROP_USER_AESTHETIC];
+    const vibeValue = properties[PROP_USER_VIBE];
 
-    // Ensure we return null if the property doesn't exist,
-    // so the client-side defaults are applied correctly.
     return {
       success: true,
       values: {

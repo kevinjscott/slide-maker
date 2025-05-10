@@ -84,10 +84,10 @@
       position: relative;
     }
     .generate-button.loading {
-      display: flex;         /* Make the button a flex container */
-      justify-content: center; /* Center spinner horizontally */
-      align-items: center;   /* Center spinner vertically */
-      min-height: 36px;      /* Set a min-height to match button's normal height */
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 36px;
     }
     #reset-button, #generate-template-button, #save-template-button, #templates-button {
       background: none;
@@ -120,7 +120,7 @@
       width: 16px;
       height: 16px;
       animation: spin 1s linear infinite;
-      display: none; /* Controlled by showSpinner JS function */
+      display: none;
     }
     @keyframes spin {
       0% { transform: rotate(0deg); }
@@ -237,6 +237,10 @@
       font-style: italic;
       text-align: center;
     }
+    textarea.new-prompt {
+      margin-top: 5px;
+      display: none;
+    }
   </style>
 </head>
 <body>
@@ -270,7 +274,7 @@
           <label for="new_prompt" style="margin: 0; font-weight: bold; flex-grow: 1; cursor: pointer;">Actual image generation prompt:</label>
           <a href="#" id="edit-image-prompt-link" style="font-size: 12px; color: #2772db; text-decoration: none; white-space: nowrap;">edit</a>
         </div>
-        <textarea name="new_prompt" id="new_prompt" class="new-prompt" rows="10" style="display: none; width: 100%; box-sizing: border-box; margin-top: 5px;"></textarea>
+        <textarea name="new_prompt" id="new_prompt" class="new-prompt" rows="10" style="width: 100%; box-sizing: border-box;"></textarea>
       </div>
       
       <button type="submit" class="button generate-button">
@@ -285,29 +289,29 @@
 
   <script>
     let typingTimer;
-    const doneTypingInterval = 300; // milliseconds
+    const doneTypingInterval = 300;
     const DEFAULT_AESTHETIC = "A flat 3d simple graphical illustration";
     const DEFAULT_VIBE = "fun, modern";
+    const NUM_IMAGES_TO_GENERATE = 8;
+    const ARROW_RIGHT = "▶";
+    const ARROW_DOWN = "▼";
+    const STATUS_SUCCESS_AUTOHIDE_DELAY = 3000;
     
-    function initialize() {
-      loadPersistedValues(); // Load persisted values or set defaults
+    let isUpdatingPrompt = false;
 
-      // Add event listeners
+    function initialize() {
+      loadPersistedValues();
       document.getElementById("aesthetic").addEventListener("input", onInputChange);
       document.getElementById("vibe").addEventListener("input", onInputChange);
       document.getElementById("topic").addEventListener("input", onInputChange);
       document.getElementById("reset-values-button").addEventListener("click", resetValuesToDefaults);
       document.getElementById("image-prompt-toggle-header").addEventListener("click", toggleImagePromptVisibility);
       
-      // Prevent link default navigation for edit-image-prompt-link
       document.getElementById("edit-image-prompt-link").addEventListener("click", function(e) {
         e.preventDefault();
-        // The toggle is handled by the parent div's click listener
       });
       
       document.getElementById("topic").focus();
-      
-      // Setup keyboard shortcuts
       setupKeyboardShortcuts();
     }
     
@@ -322,10 +326,11 @@
       statusEl.style.display = "block";
       
       if (!isError) {
-        // Hide success messages after 3 seconds
         setTimeout(() => {
-          statusEl.style.display = "none";
-        }, 3000);
+          if (statusEl.textContent === message && statusEl.style.color !== "red") {
+            statusEl.style.display = "none";
+          }
+        }, STATUS_SUCCESS_AUTOHIDE_DELAY);
       }
     }
     
@@ -338,118 +343,104 @@
     }
     
     function updateNewPrompt() {
-      setGenerateButtonState(true); // Disable button
       const aestheticValue = document.getElementById("aesthetic").value.trim();
       const vibeValue = document.getElementById("vibe").value.trim();
       const newTopic = document.getElementById("topic").value.trim();
+      const newPromptTextarea = document.getElementById("new_prompt");
 
-      // Construct the prompt template using aesthetic and vibe
       const initialPrompt = `${aestheticValue} (to be used as a full-screen PowerPoint slide) with a ${vibeValue} style containing {list items or describe the scene}. {describe texts} {describe relative emphasis of each text} {include info for the font e.g. style, characteristics. optionally specify objects used to create the letters}`;
       
       if (!newTopic) { 
-        document.getElementById("new_prompt").value = ""; 
+        newPromptTextarea.value = ""; 
         return; 
       }
       
+      if (isUpdatingPrompt) {
+        return; 
+      }
+      isUpdatingPrompt = true;
+      
+      setGenerateButtonState(true); 
       showSpinner(true);
       setStatus("Generating new prompt...", false);
       
       google.script.run
         .withSuccessHandler(response => {
-          showSpinner(false);
-          
-          // Check if response is an error message (starts with "Failed" or "Error")
           if (typeof response === 'string' && (response.startsWith("Failed") || response.startsWith("Error") || response.includes("API key"))) {
             setStatus(response, true);
-            document.getElementById("new_prompt").value = "";
+            newPromptTextarea.value = "";
           } else {
-            document.getElementById("new_prompt").value = response;
+            newPromptTextarea.value = response;
             setStatus("New prompt generated.", false);
           }
-          setGenerateButtonState(false); // Re-enable button
+          showSpinner(false);
+          setGenerateButtonState(false);
+          isUpdatingPrompt = false;
         })
         .withFailureHandler(error => {
-          showSpinner(false);
           setStatus("Error generating prompt: " + error.message, true);
           console.error("Error generating prompt: ", error);
-          setGenerateButtonState(false); // Re-enable button
+          newPromptTextarea.value = "";
+          showSpinner(false);
+          setGenerateButtonState(false);
+          isUpdatingPrompt = false;
         })
         .generateNewPrompt(initialPrompt, newTopic);
     }
 
     function submitForm(event) {
       event.preventDefault();
-      setGenerateButtonState(true); // Disable button
-
-      const newPrompt = document.getElementById("new_prompt").value;
+      const newPromptValue = document.getElementById("new_prompt").value;
       
-      if (!newPrompt) {
+      if (!newPromptValue) {
         setStatus("Please provide a prompt for image generation.", true);
         return;
       }
       
-      // Always use 8 images
-      const numImages = 8;
-      
+      setGenerateButtonState(true);
       showSpinner(true);
-      setStatus(`Generating ${numImages} images...`, false);
+      setStatus(`Generating ${NUM_IMAGES_TO_GENERATE} images...`, false);
 
-      // Store the current prompt in script properties for later use
+      const handleGenerateSuccess = (response) => {
+        showSpinner(false);
+        if (response && response.ideogramImageUrls && response.ideogramImageUrls.length > 0) {
+          setStatus(`${response.ideogramImageUrls.length} images generated. Choose an image to add to slides.`, false);
+        } else {
+          setStatus(response.statusMessage || "Image generation complete.", false);
+        }
+        setGenerateButtonState(false);
+      };
+
+      const handleGenerateError = (error) => {
+        showSpinner(false);
+        setStatus("Error generating images: " + error.message, true);
+        console.error("Error generating images: ", error);
+        setGenerateButtonState(false);
+      };
+
+      const generateImages = () => {
+        google.script.run
+          .withSuccessHandler(handleGenerateSuccess)
+          .withFailureHandler(handleGenerateError)
+          .generateSlideContent(newPromptValue);
+      };
+
       google.script.run
         .withSuccessHandler(() => {
           console.log("Prompt stored for slide notes");
-          
-          // After storing prompt, generate images
-          google.script.run
-            .withSuccessHandler(response => {
-              showSpinner(false);
-              
-              if (response && response.ideogramImageUrls && response.ideogramImageUrls.length > 0) {
-                setStatus(`${response.ideogramImageUrls.length} images generated. Choose an image to add to slides.`, false);
-              } else {
-                setStatus(response.statusMessage || "Image generation complete.", false);
-              }
-              setGenerateButtonState(false); // Re-enable button
-            })
-            .withFailureHandler(error => {
-              showSpinner(false);
-              setStatus("Error generating images: " + error.message, true);
-              console.error("Error generating images: ", error);
-              setGenerateButtonState(false); // Re-enable button
-            })
-            .generateSlideContent(newPrompt);
+          generateImages();
         })
         .withFailureHandler(error => {
           console.error("Error storing prompt: ", error);
-          // Continue with image generation even if storing prompt fails
-          google.script.run
-            .withSuccessHandler(response => {
-              showSpinner(false);
-              
-              if (response && response.ideogramImageUrls && response.ideogramImageUrls.length > 0) {
-                setStatus(`${response.ideogramImageUrls.length} images generated. Choose an image to add to slides.`, false);
-              } else {
-                setStatus(response.statusMessage || "Image generation complete.", false);
-              }
-              setGenerateButtonState(false); // Re-enable button
-            })
-            .withFailureHandler(error => {
-              showSpinner(false);
-              setStatus("Error generating images: " + error.message, true);
-              console.error("Error generating images: ", error);
-              setGenerateButtonState(false); // Re-enable button
-            })
-            .generateSlideContent(newPrompt);
+          generateImages();
         })
-        .storeCurrentPrompt(newPrompt);
+        .storeCurrentPrompt(newPromptValue);
     }
     
     function setupKeyboardShortcuts() {
       document.addEventListener("keydown", function(event) {
-        // Check for Cmd+Enter (Mac) or Ctrl+Enter (Windows)
         if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
           const button = document.querySelector(".generate-button");
-          // Only submit if the button exists and is not disabled
           if (button && !button.disabled) {
             event.preventDefault();
             submitForm(event);
@@ -463,10 +454,10 @@
       const arrow = document.getElementById("toggle-prompt-arrow");
       if (textarea.style.display === "none") {
         textarea.style.display = "block";
-        arrow.textContent = "▼";
+        arrow.textContent = ARROW_DOWN;
       } else {
         textarea.style.display = "none";
-        arrow.textContent = "▶";
+        arrow.textContent = ARROW_RIGHT;
       }
     }
 
@@ -474,8 +465,8 @@
       document.getElementById("aesthetic").value = DEFAULT_AESTHETIC;
       document.getElementById("vibe").value = DEFAULT_VIBE;
       setStatus("Aesthetic and Vibe reset to defaults.", false);
-      savePersistedValues(); // Persist the reset values
-      updateNewPrompt();   // Update the image prompt
+      savePersistedValues();
+      updateNewPrompt();
     }
 
     function savePersistedValues() {
@@ -483,7 +474,6 @@
       const vibeValue = document.getElementById("vibe").value;
       google.script.run
         .withSuccessHandler(response => {
-          // Optional: check response.success and log errors
           if (response && !response.success) {
             console.error("Error saving values: " + (response.message || "Unknown error"));
           }
@@ -514,14 +504,12 @@
           document.getElementById("aesthetic").value = aestheticToSet;
           document.getElementById("vibe").value = vibeToSet;
 
-          // Update prompt based on loaded/default values if topic has content
           if (document.getElementById("topic").value.trim()) {
             updateNewPrompt();
           }
         })
         .withFailureHandler(error => {
           console.error("Failed to call getAestheticAndVibe: " + error.message);
-          // Set defaults on failure
           document.getElementById("aesthetic").value = DEFAULT_AESTHETIC;
           document.getElementById("vibe").value = DEFAULT_VIBE;
           if (document.getElementById("topic").value.trim()) {
@@ -539,19 +527,13 @@
 
       button.disabled = disabled;
       if (disabled) {
-        if (buttonTextContent) buttonTextContent.style.display = "none"; // Hide text completely
+        if (buttonTextContent) buttonTextContent.style.display = "none";
         button.style.cursor = "not-allowed";
         button.classList.add('loading');
-        // showSpinner(true) will be called by the initiating function (updateNewPrompt or submitForm)
-        // However, for consistency and if showSpinner is not always called immediately after disabling,
-        // it's safer to call it here too if the intent is for the spinner to always show when disabled.
-        // Let's assume the calling functions (updateNewPrompt/submitForm) handle showSpinner(true) before or after this.
-        // For now, will rely on showSpinner being called from submitForm/updateNewPrompt
       } else {
-        if (buttonTextContent) buttonTextContent.style.display = "inline"; // Restore text
+        if (buttonTextContent) buttonTextContent.style.display = "inline";
         button.style.cursor = "pointer";
         button.classList.remove('loading');
-        // showSpinner(false) will be called by the initiating function.
       }
     }
 
