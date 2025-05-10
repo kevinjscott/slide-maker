@@ -1,75 +1,84 @@
-# Image Generation Web App
+# Slide Maker AI
 
-This project is a web application that allows users to generate images based on a given prompt. The application uses the Groq API for prompt generation and the Ideogram API for image generation.
+## Description
+
+Slide Maker AI is a Google Slides Add-on designed to enhance your presentation creation process by leveraging artificial intelligence. It integrates with Ideogram to generate unique images based on your prompts and uses Groq to help refine those prompts for better results. You can then easily insert the generated content directly into your slides.
 
 ## Features
 
-- Generate new prompts based on an initial prompt and a new topic.
-- Generate images based on the new prompt.
-- Save and display generated images.
-- Store form data and generated images in local storage.
+- **AI-Powered Image Generation**: Describe the image you want, and Ideogram will generate multiple options.
+- **Prompt Refinement**: Use Groq to expand or refine your initial ideas into more effective prompts for image generation.
+- **Image Picker**: Browse and select from the generated images within a dedicated picker.
+- **Direct Slide Insertion**: Add generated images and text to your slides with a single click.
+- **User-Friendly Sidebar**: Access all features conveniently through the Google Slides sidebar.
+- **Customizable Color Palette**: Image generation includes a predefined color palette to maintain visual consistency.
 
-## Requirements
+## Setup and Installation
 
-- Python 3.7+
-- FastAPI
-- httpx
-- starlette
-- groq
+This project is a Google Apps Script. To use it as a Google Slides Add-on:
 
-## Setup
-
-1. Clone the repository:
-    ```sh
-    git clone https://github.com/yourusername/your-repo.git
-    cd your-repo
-    ```
-
-2. Create a virtual environment and activate it:
-    ```sh
-    python -m venv venv
-    source venv/bin/activate  # On Windows use `venv\Scripts\activate`
-    ```
-
-3. Install the required packages:
-    ```sh
-    pip install -r requirements.txt
-    ```
-
-4. Set up your environment variables. You need to set `GROQ_API_KEY` and `IDEOGRAM_API_KEY` in your environment. You can do this by adding the following lines to your `.zshrc` or `.bashrc` file:
-    ```sh
-    export GROQ_API_KEY='your_groq_api_key'
-    export IDEOGRAM_API_KEY='your_ideogram_api_key'
-    ```
-
-5. Run the application:
-    ```sh
-    python main.py
-    ```
+1.  **Open Google Slides**: Go to [slides.google.com](https://slides.google.com).
+2.  **Open the Script Editor**:
+    - Create a new presentation or open an existing one.
+    - Click on "Extensions" > "Apps Script". This will open the Apps Script editor in a new tab.
+3.  **Copy Project Files**:
+    - Copy the content of `Code.gs` from this repository into the `Code.gs` file in the Apps Script editor.
+    - Create new HTML files in the Apps Script editor by clicking the `+` icon next to "Files":
+      - Name one `Sidebar.html` and copy the content from `Sidebar.html` in this repository.
+      - Name another `ImagePicker.html` and copy the content from `ImagePicker.html` in this repository.
+    - Open the "Project Settings" (gear icon on the left). Check "Show "appsscript.json" manifest file in editor". Then, go back to the Editor, select the `appsscript.json` file, and copy the content from `appsscript.json` in this repository.
+4.  **Set API Keys**: This is crucial for the AI features to work.
+    - In the Apps Script editor, click on "Project Settings" (the gear icon on the left).
+    - Scroll down to "Script Properties".
+    - Click "Add script property".
+    - Add the following two properties:
+      - **Property Name**: `GROQ_API_KEY`
+      - **Value**: Your API key from [Groq](https://console.groq.com/keys)
+    - Click "Add script property" again:
+      - **Property Name**: `IDEOGRAM_API_KEY`
+      - **Value**: Your API key from [Ideogram.ai](https://ideogram.ai/) (You might need to inspect network requests or refer to their documentation for how to obtain a suitable key if direct API access isn't straightforwardly provided for this type of usage).
+    - Click "Save script properties".
+5.  **Run and Authorize**:
+    - Select any function from the dropdown menu at the top (e.g., `onOpen`) and click "Run".
+    - Google will ask you to authorize the script. Review the permissions (it will need access to presentations, external services, and Drive) and allow them.
+6.  **Test**:
+    - Close the Apps Script editor tab and refresh your Google Slides presentation.
+    - You should see a new menu item: "Slide Maker AI" > "Start My Add-on".
 
 ## Usage
 
-1. Open your web browser and go to `http://127.0.0.1:8000`.
-2. Enter an initial prompt and a new topic.
-3. Click "Generate Images" to generate new prompts and images.
-4. The generated images will be displayed on the page.
+1.  **Open the Add-on**: In Google Slides, click on "Slide Maker AI" from the top menu (or from "Extensions" > "Slide Maker AI") and then "Start My Add-on".
+2.  **Show Sidebar**: Click the "Show Sidebar" button that appears in the initial card.
+3.  **Generate Content**:
+    - The "Slide Maker AI Controls" sidebar will appear.
+    - Enter a topic or a basic prompt.
+    - Optionally, use the feature to generate a more detailed prompt using Groq.
+    - Submit the prompt to generate images via Ideogram.
+4.  **Pick an Image**:
+    - An image picker dialog will appear showing the images generated by Ideogram.
+    - Select your preferred image.
+5.  **Insert Content**:
+    - Use the functions (likely available through the sidebar or after image selection) to insert the chosen image or generated text onto the current slide.
 
 ## File Structure
 
-- `main.py`: The main application file.
-- `.gitignore`: Specifies files and directories to be ignored by git.
-- `.sesskey`: Session key file (should be ignored by git).
-- `/Users/kevinjscott/.zshrc`: Shell configuration file (should be ignored by git).
+- `Code.gs`: Contains all the server-side Google Apps Script logic, including functions for UI creation, API calls to Groq and Ideogram, and Google Slides manipulation.
+- `Sidebar.html`: The HTML, CSS, and client-side JavaScript for the main sidebar interface.
+- `ImagePicker.html`: The HTML, CSS, and client-side JavaScript for the dialog that allows users to pick from generated images.
+- `appsscript.json`: The manifest file for the Google Apps Script project. It defines project settings, OAuth scopes, add-on properties, and whitelisted URLs.
+- `.gitignore`: Specifies intentionally untracked files that Git should ignore.
+- `README.md`: This file.
 
-## Contributing
+## External APIs Used
 
-1. Fork the repository.
-2. Create a new branch (`git checkout -b feature-branch`).
-3. Make your changes.
-4. Commit your changes (`git commit -am 'Add new feature'`).
-5. Push to the branch (`git push origin feature-branch`).
-6. Create a new Pull Request.
+- **Ideogram API**: (`https://api.ideogram.ai/v1/ideogram-v3/generate`) Used for generating images based on textual prompts.
+- **Groq API**: (`https://api.groq.com/openai/v1/chat/completions`) Used for generating and refining prompts with the `llama-3.3-70b-versatile` model.
 
-## License
+## Disclaimer
 
-This project is licensed under the MIT License. See the `LICENSE` file for more details.
+- API keys for Groq and Ideogram are required. Please ensure you have valid keys and have configured them correctly in the Script Properties.
+- The methods for obtaining and using the Ideogram API key might be subject to Ideogram's terms of service. This script uses a method involving direct HTTP requests.
+
+---
+
+This README provides a basic outline. You can expand on any section with more details as needed.
