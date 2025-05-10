@@ -129,6 +129,25 @@
       border-radius: 4px;
       display: none;
     }
+    #reset-values-button {
+      background: none;
+      border: none;
+      color: #666;
+      cursor: pointer;
+      font-size: 18px;
+      padding: 5px;
+      margin-left: 5px;
+      width: 30px;
+      height: 30px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 4px;
+    }
+    #reset-values-button:hover {
+      color: #2772db;
+      background-color: rgba(39, 114, 219, 0.1);
+    }
     hr {
       border: none;
       border-top: 1px solid #ddd;
@@ -216,40 +235,21 @@
 </head>
 <body>
   <div class="container">
+    <div style="display: flex; justify-content: flex-end; align-items: center; margin-bottom: 10px;">
+        <button type="button" id="reset-values-button" title="Reset Aesthetic & Vibe to Defaults" aria-label="Reset Aesthetic & Vibe to Defaults">
+          🔄
+        </button>
+    </div>
     <form id="promptForm" onsubmit="submitForm(event)">
-      <div class="form-group initial-prompt-container">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
-          <label for="initial_prompt">Prompt template:</label>
-          <div class="template-buttons">
-            <button type="button" id="save-template-button" title="Save Template" aria-label="Save Template">
-              💾
-            </button>
-            <button type="button" id="templates-button" title="My Templates" aria-label="My Templates">
-              📋
-            </button>
-            <button type="button" id="generate-template-button" title="Generate New Template" aria-label="Generate New Template">
-              ✨
-            </button>
-            <button type="button" id="reset-button" title="Reset to Default" aria-label="Reset to Default">
-              🔄
-            </button>
-          </div>
-        </div>
-        <div class="templates-dropdown" id="templates-dropdown"></div>
-        <div class="textarea-wrapper">
-          <textarea id="initial_prompt" name="initial_prompt" rows="10"></textarea>
-        </div>
-      </div>
-
       <div class="form-group">
-        <label for="aesthetic">Aesthetic:</label>
-        <div class="example-texts">e.g. hand-drawn sketch, wood carving, watercolor illustration, surreal digital collage, 2d vector, low-poly, 3d, infographic, crayon drawing, gorgeous 3d pencil sketch, isometric, blueprint, etc.</div>
+        <label for="aesthetic">Visual aesthetic:</label>
+        <div class="example-texts">Examples: hand-drawn sketch, wood carving, watercolor illustration, surreal digital collage, 2d vector, low-poly, 3d, infographic, crayon drawing, gorgeous 3d pencil sketch, isometric, blueprint, formal, stained glass,etc. Combine and/or create your own.</div>
         <textarea name="aesthetic" id="aesthetic" rows="1"></textarea>
       </div>
 
       <div class="form-group">
-        <label for="vibe">Vibe:</label>
-        <div class="example-texts">e.g. playful, calming, vibrant, somber, dreamy, tech-inspired, fun, modern, colorful, minimalistic, fantasy, outer space, underwater, etc.</div>
+        <label for="vibe">Style / vibe of the content:</label>
+        <div class="example-texts">Examples: playful and vibrant, calming, somber, dreamy, tech-inspired, fun and modern, colorful, minimalistic, fantasy, outer space, underwater, etc. Combine and/or create your own.</div>
         <textarea name="vibe" id="vibe" rows="1"></textarea>
       </div>
 
@@ -269,57 +269,23 @@
     <div id="status"></div>
     <div id="spinner" class="spinner"></div>
     
-    <!-- Save Template Modal -->
-    <div class="save-template-modal" id="save-template-modal">
-      <div class="modal-content">
-        <h2>Save Template</h2>
-        <div class="form-group">
-          <label for="template-name">Template Name:</label>
-          <input type="text" id="template-name" placeholder="Enter template name">
-        </div>
-        <div class="modal-buttons">
-          <button class="button secondary-button" id="cancel-save-template">Cancel</button>
-          <button class="button" id="confirm-save-template">Save</button>
-        </div>
-      </div>
-    </div>
   </div>
 
   <script>
-    // Default Initial Prompt
-    const DEFAULT_INITIAL_PROMPT = `A flat 3d simple graphical illustration (to be used as a full-screen PowerPoint slide) with a fun, modern style containing {list items or describe the scene}.
-
-{describe texts} {describe relative emphasis of each text}
-
-{include info for the font e.g. style, characteristics. optionally specify objects used to create the letters}`;
     let typingTimer;
     const doneTypingInterval = 300; // milliseconds
-    let userTemplates = {};
+    const DEFAULT_AESTHETIC = "A flat 3d simple graphical illustration";
+    const DEFAULT_VIBE = "fun, modern";
     
     function initialize() {
-      // Load default template initially (will be overridden if last used template exists)
-      document.getElementById("initial_prompt").value = DEFAULT_INITIAL_PROMPT;
-      
+      loadPersistedValues(); // Load persisted values or set defaults
+
       // Add event listeners
-      document.getElementById("initial_prompt").addEventListener("input", onInputChange);
-      document.getElementById("initial_prompt").addEventListener("blur", saveCurrentTemplate);
+      document.getElementById("aesthetic").addEventListener("input", onInputChange);
+      document.getElementById("vibe").addEventListener("input", onInputChange);
       document.getElementById("topic").addEventListener("input", onInputChange);
-      document.getElementById("reset-button").addEventListener("click", resetToDefault);
-      document.getElementById("generate-template-button").addEventListener("click", generateNewTemplate);
-      document.getElementById("save-template-button").addEventListener("click", openSaveTemplateModal);
-      document.getElementById("templates-button").addEventListener("click", toggleTemplatesDropdown);
-      document.getElementById("cancel-save-template").addEventListener("click", closeSaveTemplateModal);
-      document.getElementById("confirm-save-template").addEventListener("click", saveTemplate);
+      document.getElementById("reset-values-button").addEventListener("click", resetValuesToDefaults);
       
-      // Close dropdown when clicking outside
-      document.addEventListener("click", function(event) {
-        if (!event.target.closest("#templates-button") && !event.target.closest("#templates-dropdown")) {
-          document.getElementById("templates-dropdown").classList.remove("active");
-        }
-      });
-      
-      loadUserTemplates();
-      loadLastUsedTemplate();
       document.getElementById("topic").focus();
       
       // Setup keyboard shortcuts
@@ -344,50 +310,25 @@
       }
     }
     
-    function resetToDefault() {
-      document.getElementById("initial_prompt").value = DEFAULT_INITIAL_PROMPT;
-      setStatus("Prompt template reset to default.", false);
-      saveCurrentTemplate();
-      updateNewPrompt();
-    }
-    
-    function generateNewTemplate() {
-      showSpinner(true);
-      setStatus("Generating new prompt template...", false);
-      
-      google.script.run
-        .withSuccessHandler(response => {
-          showSpinner(false);
-          
-          if (typeof response === 'string' && (response.startsWith("Failed") || response.startsWith("Error") || response.includes("API key"))) {
-            setStatus(response, true);
-          } else {
-            document.getElementById("initial_prompt").value = response;
-            setStatus("New prompt template generated.", false);
-            saveCurrentTemplate();
-            // Update the generated prompt based on the new template
-            updateNewPrompt();
-          }
-        })
-        .withFailureHandler(error => {
-          showSpinner(false);
-          setStatus("Error generating template: " + error.message, true);
-          console.error("Error generating template: ", error);
-        })
-        .generateNewPromptTemplate();
-    }
-    
     function onInputChange() {
       clearTimeout(typingTimer);
-      typingTimer = setTimeout(updateNewPrompt, doneTypingInterval);
+      typingTimer = setTimeout(() => {
+        updateNewPrompt();
+        savePersistedValues();
+      }, doneTypingInterval);
     }
     
     function updateNewPrompt() {
-      const initialPrompt = document.getElementById("initial_prompt").value;
-      const newTopic = document.getElementById("topic").value;
+      const aestheticValue = document.getElementById("aesthetic").value.trim();
+      const vibeValue = document.getElementById("vibe").value.trim();
+      const newTopic = document.getElementById("topic").value.trim();
+
+      // Construct the prompt template using aesthetic and vibe
+      const initialPrompt = `${aestheticValue} (to be used as a full-screen PowerPoint slide) with a ${vibeValue} style containing {list items or describe the scene}. {describe texts} {describe relative emphasis of each text} {include info for the font e.g. style, characteristics. optionally specify objects used to create the letters}`;
       
-      if (!initialPrompt || !newTopic) {
-        return; // Don't update if either field is empty
+      if (!newTopic) { 
+        document.getElementById("new_prompt").value = ""; 
+        return; 
       }
       
       showSpinner(true);
@@ -397,7 +338,6 @@
         .withSuccessHandler(response => {
           showSpinner(false);
           
-          // Check if response is an error message (starts with "Failed" or "Error")
           if (typeof response === 'string' && (response.startsWith("Failed") || response.startsWith("Error") || response.includes("API key"))) {
             setStatus(response, true);
             document.getElementById("new_prompt").value = "";
@@ -484,187 +424,68 @@
         }
       });
     }
-    
-    // Template management functions
-    function loadUserTemplates() {
-      showSpinner(true);
-      
-      google.script.run
-        .withSuccessHandler(response => {
-          showSpinner(false);
-          
-          if (response.success) {
-            userTemplates = response.templates;
-            updateTemplatesDropdown();
-          } else {
-            setStatus("Error loading templates: " + response.message, true);
-          }
-        })
-        .withFailureHandler(error => {
-          showSpinner(false);
-          setStatus("Error loading templates: " + error.message, true);
-          console.error("Error loading templates: ", error);
-        })
-        .getUserPromptTemplates();
-    }
-    
-    function updateTemplatesDropdown() {
-      const dropdown = document.getElementById("templates-dropdown");
-      dropdown.innerHTML = "";
-      
-      if (Object.keys(userTemplates).length === 0) {
-        const emptyMessage = document.createElement("div");
-        emptyMessage.className = "empty-templates";
-        emptyMessage.textContent = "No saved templates";
-        dropdown.appendChild(emptyMessage);
-        return;
-      }
-      
-      for (const [name, template] of Object.entries(userTemplates)) {
-        const item = document.createElement("div");
-        item.className = "template-item";
-        
-        const templateName = document.createElement("span");
-        templateName.textContent = name;
-        templateName.style.flex = "1";
-        templateName.style.cursor = "pointer";
-        templateName.onclick = () => {
-          document.getElementById("initial_prompt").value = template;
-          dropdown.classList.remove("active");
-          saveCurrentTemplate();
-          updateNewPrompt();
-          setStatus(`Template "${name}" loaded`, false);
-        };
-        
-        const deleteButton = document.createElement("span");
-        deleteButton.className = "delete-template";
-        deleteButton.textContent = "✕";
-        deleteButton.title = "Delete template";
-        deleteButton.onclick = (e) => {
-          e.stopPropagation();
-          deleteTemplate(name);
-        };
-        
-        item.appendChild(templateName);
-        item.appendChild(deleteButton);
-        dropdown.appendChild(item);
-      }
-    }
-    
-    function toggleTemplatesDropdown() {
-      const dropdown = document.getElementById("templates-dropdown");
-      dropdown.classList.toggle("active");
-    }
-    
-    function openSaveTemplateModal() {
-      document.getElementById("template-name").value = "";
-      document.getElementById("save-template-modal").classList.add("active");
-    }
-    
-    function closeSaveTemplateModal() {
-      document.getElementById("save-template-modal").classList.remove("active");
-    }
-    
-    function saveTemplate() {
-      const templateName = document.getElementById("template-name").value.trim();
-      const templateText = document.getElementById("initial_prompt").value.trim();
-      
-      if (!templateName) {
-        setStatus("Please enter a template name", true);
-        return;
-      }
-      
-      if (!templateText) {
-        setStatus("Template cannot be empty", true);
-        return;
-      }
-      
-      showSpinner(true);
-      setStatus("Saving template...", false);
-      
-      google.script.run
-        .withSuccessHandler(response => {
-          showSpinner(false);
-          
-          if (response.success) {
-            userTemplates = response.templates;
-            updateTemplatesDropdown();
-            closeSaveTemplateModal();
-            setStatus(`Template "${templateName}" saved successfully`, false);
-          } else {
-            setStatus("Error saving template: " + response.message, true);
-          }
-        })
-        .withFailureHandler(error => {
-          showSpinner(false);
-          setStatus("Error saving template: " + error.message, true);
-          console.error("Error saving template: ", error);
-        })
-        .saveUserPromptTemplate(templateName, templateText);
-    }
-    
-    function deleteTemplate(templateName) {
-      if (!confirm(`Are you sure you want to delete the template "${templateName}"?`)) {
-        return;
-      }
-      
-      showSpinner(true);
-      setStatus(`Deleting template "${templateName}"...`, false);
-      
-      google.script.run
-        .withSuccessHandler(response => {
-          showSpinner(false);
-          
-          if (response.success) {
-            userTemplates = response.templates;
-            updateTemplatesDropdown();
-            setStatus(`Template "${templateName}" deleted successfully`, false);
-          } else {
-            setStatus("Error deleting template: " + response.message, true);
-          }
-        })
-        .withFailureHandler(error => {
-          showSpinner(false);
-          setStatus("Error deleting template: " + error.message, true);
-          console.error("Error deleting template: ", error);
-        })
-        .deleteUserPromptTemplate(templateName);
+
+    function resetValuesToDefaults() {
+      document.getElementById("aesthetic").value = DEFAULT_AESTHETIC;
+      document.getElementById("vibe").value = DEFAULT_VIBE;
+      setStatus("Aesthetic and Vibe reset to defaults.", false);
+      savePersistedValues(); // Persist the reset values
+      updateNewPrompt();   // Update the image prompt
     }
 
-    function saveCurrentTemplate() {
-      const templateText = document.getElementById("initial_prompt").value.trim();
-      if (!templateText) return;
-      
+    function savePersistedValues() {
+      const aestheticValue = document.getElementById("aesthetic").value;
+      const vibeValue = document.getElementById("vibe").value;
       google.script.run
         .withSuccessHandler(response => {
-          // Quietly save without showing status messages to the user
-          if (!response.success) {
-            console.error("Error saving template state:", response.message);
+          // Optional: check response.success and log errors
+          if (response && !response.success) {
+            console.error("Error saving values: " + (response.message || "Unknown error"));
           }
         })
         .withFailureHandler(error => {
-          console.error("Error saving template state:", error.message);
+          console.error("Failed to call saveAestheticAndVibe: " + error.message);
         })
-        .saveLastUsedTemplate(templateText);
+        .saveAestheticAndVibe(aestheticValue, vibeValue);
     }
     
-    function loadLastUsedTemplate() {
+    function loadPersistedValues() {
       google.script.run
         .withSuccessHandler(response => {
-          if (response.success && response.template) {
-            document.getElementById("initial_prompt").value = response.template;
-            // If topic exists, update the generated prompt
-            if (document.getElementById("topic").value.trim()) {
-              updateNewPrompt();
+          let aestheticToSet = DEFAULT_AESTHETIC;
+          let vibeToSet = DEFAULT_VIBE;
+
+          if (response && response.success && response.values) {
+            if (response.values.aesthetic) {
+              aestheticToSet = response.values.aesthetic;
             }
+            if (response.values.vibe) {
+              vibeToSet = response.values.vibe;
+            }
+          } else if (response && !response.success) {
+            console.error("Error loading values: " + (response.message || "Unknown error"));
+          }
+          
+          document.getElementById("aesthetic").value = aestheticToSet;
+          document.getElementById("vibe").value = vibeToSet;
+
+          // Update prompt based on loaded/default values if topic has content
+          if (document.getElementById("topic").value.trim()) {
+            updateNewPrompt();
           }
         })
         .withFailureHandler(error => {
-          console.error("Error loading last template:", error.message);
+          console.error("Failed to call getAestheticAndVibe: " + error.message);
+          // Set defaults on failure
+          document.getElementById("aesthetic").value = DEFAULT_AESTHETIC;
+          document.getElementById("vibe").value = DEFAULT_VIBE;
+          if (document.getElementById("topic").value.trim()) {
+            updateNewPrompt();
+          }
         })
-        .getLastUsedTemplate();
+        .getAestheticAndVibe();
     }
-
+    
     window.onload = initialize;
   </script>
 </body>

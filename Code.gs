@@ -1052,3 +1052,38 @@ function getLastUsedTemplate() {
     };
   }
 }
+
+// Functions for persisting aesthetic and vibe
+function saveAestheticAndVibe(aesthetic, vibe) {
+  try {
+    PropertiesService.getUserProperties().setProperties({
+      userAesthetic: aesthetic,
+      userVibe: vibe,
+    });
+    return { success: true };
+  } catch (e) {
+    console.error("Error in saveAestheticAndVibe: " + e.toString());
+    return { success: false, message: e.message };
+  }
+}
+
+function getAestheticAndVibe() {
+  try {
+    const properties = PropertiesService.getUserProperties().getProperties();
+    const aestheticValue = properties["userAesthetic"];
+    const vibeValue = properties["userVibe"];
+
+    // Ensure we return null if the property doesn't exist,
+    // so the client-side defaults are applied correctly.
+    return {
+      success: true,
+      values: {
+        aesthetic: aestheticValue === undefined ? null : aestheticValue,
+        vibe: vibeValue === undefined ? null : vibeValue,
+      },
+    };
+  } catch (e) {
+    console.error("Error in getAestheticAndVibe: " + e.toString());
+    return { success: false, message: e.message };
+  }
+}
