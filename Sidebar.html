@@ -81,6 +81,13 @@
       margin-top: 5px;
       padding: 10px 15px;
       width: 100%;
+      position: relative;
+    }
+    .generate-button.loading {
+      display: flex;         /* Make the button a flex container */
+      justify-content: center; /* Center spinner horizontally */
+      align-items: center;   /* Center spinner vertically */
+      min-height: 36px;      /* Set a min-height to match button's normal height */
     }
     #reset-button, #generate-template-button, #save-template-button, #templates-button {
       background: none;
@@ -113,8 +120,7 @@
       width: 16px;
       height: 16px;
       animation: spin 1s linear infinite;
-      display: none;
-      margin-left: 10px;
+      display: none; /* Controlled by showSpinner JS function */
     }
     @keyframes spin {
       0% { transform: rotate(0deg); }
@@ -267,11 +273,13 @@
         <textarea name="new_prompt" id="new_prompt" class="new-prompt" rows="10" style="display: none; width: 100%; box-sizing: border-box; margin-top: 5px;"></textarea>
       </div>
       
-      <button type="submit" class="button generate-button">Generate Images <span class="shortcut-hint">(⌘+Enter)</span></button>
+      <button type="submit" class="button generate-button">
+        <span class="button-text-content">Generate Images <span class="shortcut-hint">(⌘+Enter)</span></span>
+        <div id="spinner" class="spinner"></div>
+      </button>
     </form>
     
     <div id="status"></div>
-    <div id="spinner" class="spinner"></div>
     
   </div>
 
@@ -525,10 +533,25 @@
     
     function setGenerateButtonState(disabled) {
       const button = document.querySelector(".generate-button");
-      if (button) {
-        button.disabled = disabled;
-        button.style.opacity = disabled ? "0.5" : "1";
-        button.style.cursor = disabled ? "not-allowed" : "pointer";
+      if (!button) return;
+
+      const buttonTextContent = button.querySelector(".button-text-content"); 
+
+      button.disabled = disabled;
+      if (disabled) {
+        if (buttonTextContent) buttonTextContent.style.display = "none"; // Hide text completely
+        button.style.cursor = "not-allowed";
+        button.classList.add('loading');
+        // showSpinner(true) will be called by the initiating function (updateNewPrompt or submitForm)
+        // However, for consistency and if showSpinner is not always called immediately after disabling,
+        // it's safer to call it here too if the intent is for the spinner to always show when disabled.
+        // Let's assume the calling functions (updateNewPrompt/submitForm) handle showSpinner(true) before or after this.
+        // For now, will rely on showSpinner being called from submitForm/updateNewPrompt
+      } else {
+        if (buttonTextContent) buttonTextContent.style.display = "inline"; // Restore text
+        button.style.cursor = "pointer";
+        button.classList.remove('loading');
+        // showSpinner(false) will be called by the initiating function.
       }
     }
 
