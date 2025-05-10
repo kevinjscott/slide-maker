@@ -348,7 +348,8 @@
       const newTopic = document.getElementById("topic").value.trim();
       const newPromptTextarea = document.getElementById("new_prompt");
 
-      const initialPrompt = `${aestheticValue} (to be used as a full-screen PowerPoint slide) with a ${vibeValue} style containing {list items or describe the scene}. {describe texts} {describe relative emphasis of each text} {include info for the font e.g. style, characteristics. optionally specify objects used to create the letters}`;
+      const initialPrompt = `${aestheticValue} (to be used as a full-screen PowerPoint slide) with a ${vibeValue} style containing {list items or describe the scene}. {describe texts to include (can be few or many as appropriate)} {describe relative emphasis of each text} {include info for the font e.g. style, characteristics. For informal styles, optionally specify objects used to create / decorate the text}`;
+      console.log(initialPrompt);
       
       if (!newTopic) { 
         newPromptTextarea.value = ""; 

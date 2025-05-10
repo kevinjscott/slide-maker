@@ -60,11 +60,6 @@ function _makeGroqApiCall(messages, model, temperature, max_tokens) {
       temperature: temperature || 0.3, // Default temperature, can be overridden
     };
 
-    console.log(
-      "Groq API payload:",
-      JSON.stringify(groqPayload).substring(0, 500) + "..."
-    );
-
     const groqOptions = {
       method: "post",
       contentType: "application/json",
@@ -76,16 +71,9 @@ function _makeGroqApiCall(messages, model, temperature, max_tokens) {
       muteHttpExceptions: true,
     };
 
-    console.log("Making Groq API request to: " + GROQ_API_URL);
     const groqResponse = UrlFetchApp.fetch(GROQ_API_URL, groqOptions);
     const groqResponseCode = groqResponse.getResponseCode();
     const groqResponseBody = groqResponse.getContentText();
-
-    console.log("Groq API response code:", groqResponseCode);
-    console.log(
-      "Groq API response (first 100 chars):",
-      groqResponseBody.substring(0, 100) + "..."
-    );
 
     if (groqResponseCode === 200) {
       const groqResult = JSON.parse(groqResponseBody);
@@ -95,7 +83,9 @@ function _makeGroqApiCall(messages, model, temperature, max_tokens) {
         groqResult.choices[0].message &&
         groqResult.choices[0].message.content
       ) {
-        return { success: groqResult.choices[0].message.content.trim() };
+        const content = groqResult.choices[0].message.content.trim();
+        console.log("Result: ", content);
+        return { success: content };
       } else {
         console.error(
           "Failed to parse content from Groq response",
@@ -121,28 +111,6 @@ function _makeGroqApiCall(messages, model, temperature, max_tokens) {
   } catch (e) {
     console.error("Error in _makeGroqApiCall:", e);
     return { error: "Exception during Groq API call: " + e.toString() };
-  }
-}
-
-function onInstall(e) {
-  onOpen(e);
-}
-
-function onOpen(e) {
-  Logger.log(
-    "onOpen triggered. AuthMode: " +
-      e.authMode +
-      " for document ID: " +
-      SlidesApp.getActivePresentation().getId()
-  );
-  try {
-    SlidesApp.getUi()
-      .createAddonMenu()
-      .addItem("Start My Add-on", "onHomepage")
-      .addToUi();
-    Logger.log("Menu created successfully.");
-  } catch (err) {
-    Logger.log("Error creating menu in onOpen: " + err.message);
   }
 }
 
@@ -190,7 +158,7 @@ function showSidebar() {
  * @return {string} A status message.
  */
 function generateSlideContent(prompt) {
-  console.log("generateSlideContent called with prompt:", prompt);
+  console.log(prompt);
 
   const ideogramApiKey = _getApiKey(PROP_IDEOGRAM_API_KEY);
 
@@ -464,17 +432,12 @@ function saveApiKeys(groqKey, ideogramKey) {
  * @return {string} The generated prompt
  */
 function generateNewPrompt(initialPrompt, newTopic) {
-  console.log("generateNewPrompt called with topic:", newTopic);
-
-  const groqMessages = [
-    {
-      role: "user",
-      content:
-        `
+  const content =
+    `
 Create a prompt using the template, but make it about the given topic. Keep the style and punctuation EXACTLY the same! Anything inside {} is an instruction on how to vary the prompt, not part of the prompt itself, so don't include it.
 
 <example>
-<template>A flat 3d simple graphical illustration (to be used as a full-screen PowerPoint slide) with a mellow, modern style containing {list items or describe the scene}. Contains ONLY these large texts: "{list key concepts, max 4 words each}" with the emphasis on "{one of the texts}". Use bold fonts for the text lettering.</template>
+<template>A flat 3d simple graphical illustration (to be used as a full-screen PowerPoint slide) with a mellow, modern style containing {list items or describe the scene}. Contains ONLY these large texts: "{list key concepts}" with the emphasis on "{one of the texts}". Use bold fonts for the text lettering.</template>
 <topic>Golden Retrievers make excellent pets</topic>
 <response>
 A flat 3d simple graphical illustration (to be used as a full-screen PowerPoint slide) with a mellow, modern style containing happy Golden Retrievers playing. Contains ONLY these large texts: "Golden Retriever", "Loyal Family Dogs", "Easy To Train", "Faithful Companions" with the emphasis on "Golden Retriever". Use bold fonts for the text lettering.
@@ -482,29 +445,67 @@ A flat 3d simple graphical illustration (to be used as a full-screen PowerPoint 
 </example>
 
 <example>
-<template>A flat 3d simple graphical illustration (to be used as a full-screen PowerPoint slide) with a mellow, modern style containing {list items or describe the scene}. Contains ONLY these large texts: "{list key concepts, max 4 words each}" with the emphasis on "{one of the texts}". Use bold fonts for the text lettering.</template>
+<template>A flat 3d simple graphical illustration (to be used as a full-screen PowerPoint slide) with a mellow, modern style containing {list items or describe the scene}. Contains ONLY these large texts: "{list key concepts}" with the emphasis on "{one of the texts}". Use bold fonts for the text lettering.</template>
 <topic>Summit County is a great place to visit in the summer</topic>
 <response>
-A flat 3d simple graphical illustration (to be used as a full-screen PowerPoint slide) with a mellow, modern style containing mountains, lakes, and hiking trails. Contains ONLY these large texts: "Summer Vacation", "Mountain Scenery", "Summit County" with the emphasis on "Summit County". Use bold fonts for the text lettering.</response>
+A flat 3d simple graphical illustration (to be used as a full-screen PowerPoint slide) with a mellow, modern style containing mountains, lakes, and hiking trails. Contains ONLY these large texts: "Summer", "Summit County" with the emphasis on "Summit County". Use bold fonts for the text lettering.</response>
 </example>
 
-<template>` +
-        initialPrompt +
-        `</template>
-<topic>` +
-        newTopic +
-        `</topic>
-`,
+<example>
+<template>A flat 3d simple graphical illustration (to be used as a full-screen PowerPoint slide) with a mellow, modern style containing {list items or describe the scene}. Contains ONLY these large texts: "{list key concepts}" with the emphasis on "{one of the texts}". Use bold fonts for the text lettering.</template>
+<topic>Renewable energy is reshaping the world</topic>
+<response>
+A flat 3d simple graphical illustration (to be used as a full-screen PowerPoint slide) with a mellow, modern style containing wind turbines on rolling hills, solar panels, and a glowing sun. Contains ONLY these large texts: "Renewable Energy", "Clean Power", "Future", "Innovation" with the emphasis on "Renewable Energy". Use bold fonts for the text lettering.
+</response>
+</example>
+
+<example>
+<template>A flat 3d simple graphical illustration (to be used as a full-screen PowerPoint slide) with a mellow, modern style containing {list items or describe the scene}. Contains ONLY these large texts: "{list key concepts}" with the emphasis on "{one of the texts}". Use script fonts for the text lettering.</template>
+<topic>Space exploration inspires new generations</topic>
+<response>
+A flat 3d simple graphical illustration (to be used as a full-screen PowerPoint slide) with a mellow, modern style containing a rocket launching toward planets and stars, an astronaut waving, and swirling galaxies. Contains ONLY these large texts: "Space Exploration", "Innovation", "Discovery", "Inspiration" with the emphasis on "Space Exploration". Also list explorers together in a list: "Neil Armstrong", "Buzz Aldrin", "Yuri Gagarin", "Valentina Tereshkova", "Chris Hadfield", "Mae Jemison". Use script fonts for the text lettering.
+</response>
+</example>
+
+<example>
+<template>A flat 3d simple graphical illustration (to be used as a full-screen PowerPoint slide) with a mellow, modern style containing {list items or describe the scene}. Contains ONLY these large texts: "{list key concepts}" with the emphasis on "{one of the texts}". Use bold fonts for the text lettering.</template>
+<topic>
+Slide 8: Replace Active Directory with Okta - Gave Us SSO and MFA Right Away
+* Implementation of Okta for unified identity and access management
+A stylized image of a key unlocking a digital lock, with Okta's logo prominently displayed, surrounded by a few devices (laptop, phone, tablet) with secure login screens.
+</topic>
+<response>
+A flat 3d simple graphical illustration (to be used as a full-screen PowerPoint slide) with a mellow, modern style containing a stylized image of a key unlocking a digital lock, with Okta's logo prominently displayed, surrounded by a few devices (laptop, phone, tablet) with secure login screens. Contains ONLY these large texts: "Okta", "Single Sign On", "Multi Factor Authentication" with the emphasis on "Okta", then "Single Sign On", and least on "Multi Factor Authentication". Include "Active Directory" text with a strikethrough effect indicating that it's been replaced. Use bold fonts for the text lettering.
+</response>
+</example>
+
+
+
+<template>
+` +
+    initialPrompt +
+    `
+</template>
+
+<topic>
+` +
+    newTopic +
+    `
+</topic>
+`;
+
+  console.log(content);
+
+  const groqMessages = [
+    {
+      role: "user",
+      content: content,
     },
   ];
 
   const result = _makeGroqApiCall(groqMessages, GROQ_MODEL_DEFAULT, 0.3, 1000);
 
   if (result.success) {
-    console.log(
-      "Generated new prompt (first 50 chars):",
-      result.success.substring(0, 50) + "..."
-    );
     return result.success;
   } else {
     console.error("generateNewPrompt failed:", result.error);
@@ -813,66 +814,6 @@ function storeCurrentPrompt(prompt) {
   } catch (e) {
     console.error("Error storing current prompt:", e);
     return false;
-  }
-}
-
-/**
- * Generates a new prompt template variation.
- *
- * @return {string} A new prompt template
- */
-function generateNewPromptTemplate() {
-  console.log("generateNewPromptTemplate called");
-
-  const templateInstructions = `
-<template>
-A [flat 3d simple graphical illustration] (to be used as a full-screen PowerPoint slide) with a [fun, modern] style containing {list items or describe the scene}.
-
-{describe texts} {describe relative emphasis of each text}
-
-{include info for the font e.g. style, characteristics. optionally specify objects used to create the letters}
-</template>
-
-==========
-
-The text above is a template for creating AI image prompts. Vary the items in square brackets [] to create 1 completely different version. Keep all the other wording exactly the same. Exclude the square brackets in your output. Do not follow any of the instructions in the template.
-
-Example outputs:
-
-A surreal digital collage (to be used as a full-screen PowerPoint slide) with a dreamy, colorful style containing {list items or describe the scene}. {describe texts} {describe relative emphasis of each text} {include info for the font e.g. style, characteristics. optionally specify objects used to create the letters}
-
-
-A watercolor illustration (to be used as a full-screen PowerPoint slide) with a gentle, calming style containing {list items or describe the scene}. {describe texts} {describe relative emphasis of each text} {include info for the font e.g. style, characteristics. optionally specify objects used to create the letters}
-
-A gorgeous 3d pencil sketch (to be used as a full-screen PowerPoint slide) with a vibrant, artistic style containing {list items or describe the scene}. {describe texts} {describe relative emphasis of each text} {include info for the font e.g. style, characteristics. optionally specify objects used to create the letters}
-
-A crayon drawing (to be used as a full-screen PowerPoint slide) with a playful, childlike style containing {list items or describe the scene}. {describe texts} {describe relative emphasis of each text} {include info for the font e.g. style, characteristics. optionally specify objects used to create the letters}
-
-A isometric flat design (to be used as a full-screen PowerPoint slide) with a clean, tech-inspired style containing {list items or describe the scene}. {describe texts} {describe relative emphasis of each text} {include info for the font e.g. style, characteristics. optionally specify objects used to create the letters}
-
-A flat 3d simple graphical illustration (to be used as a full-screen PowerPoint slide) with a fun, modern style containing {list items or describe the scene}. {describe texts} {describe relative emphasis of each text} {include info for the font e.g. style, characteristics. optionally specify objects used to create the letters}
-
-`;
-
-  const groqMessages = [
-    {
-      role: "user",
-      content: templateInstructions,
-    },
-  ];
-
-  // Using a higher temperature for more varied template generation
-  const result = _makeGroqApiCall(groqMessages, GROQ_MODEL_DEFAULT, 1.2, 1000);
-
-  if (result.success) {
-    console.log(
-      "Generated new template (first 50 chars):",
-      result.success.substring(0, 50) + "..."
-    );
-    return result.success;
-  } else {
-    console.error("generateNewPromptTemplate failed:", result.error);
-    return result.error || "Failed to generate new template. Please try again.";
   }
 }
 
