@@ -261,7 +261,7 @@
       <div class="form-group">
         <div id="image-prompt-toggle-header" style="display: flex; align-items: center; cursor: pointer; margin-bottom: 5px;">
           <span id="toggle-prompt-arrow" style="margin-right: 8px; font-family: sans-serif; width: 12px; text-align: center;">▶</span>
-          <label for="new_prompt" style="margin: 0; font-weight: bold; flex-grow: 1; cursor: pointer;">Image prompt:</label>
+          <label for="new_prompt" style="margin: 0; font-weight: bold; flex-grow: 1; cursor: pointer;">Actual image generation prompt:</label>
           <a href="#" id="edit-image-prompt-link" style="font-size: 12px; color: #2772db; text-decoration: none; white-space: nowrap;">edit</a>
         </div>
         <textarea name="new_prompt" id="new_prompt" class="new-prompt" rows="10" style="display: none; width: 100%; box-sizing: border-box; margin-top: 5px;"></textarea>
@@ -330,6 +330,7 @@
     }
     
     function updateNewPrompt() {
+      setGenerateButtonState(true); // Disable button
       const aestheticValue = document.getElementById("aesthetic").value.trim();
       const vibeValue = document.getElementById("vibe").value.trim();
       const newTopic = document.getElementById("topic").value.trim();
@@ -349,6 +350,7 @@
         .withSuccessHandler(response => {
           showSpinner(false);
           
+          // Check if response is an error message (starts with "Failed" or "Error")
           if (typeof response === 'string' && (response.startsWith("Failed") || response.startsWith("Error") || response.includes("API key"))) {
             setStatus(response, true);
             document.getElementById("new_prompt").value = "";
@@ -356,17 +358,21 @@
             document.getElementById("new_prompt").value = response;
             setStatus("New prompt generated.", false);
           }
+          setGenerateButtonState(false); // Re-enable button
         })
         .withFailureHandler(error => {
           showSpinner(false);
           setStatus("Error generating prompt: " + error.message, true);
           console.error("Error generating prompt: ", error);
+          setGenerateButtonState(false); // Re-enable button
         })
         .generateNewPrompt(initialPrompt, newTopic);
     }
 
     function submitForm(event) {
       event.preventDefault();
+      setGenerateButtonState(true); // Disable button
+
       const newPrompt = document.getElementById("new_prompt").value;
       
       if (!newPrompt) {
@@ -395,11 +401,13 @@
               } else {
                 setStatus(response.statusMessage || "Image generation complete.", false);
               }
+              setGenerateButtonState(false); // Re-enable button
             })
             .withFailureHandler(error => {
               showSpinner(false);
               setStatus("Error generating images: " + error.message, true);
               console.error("Error generating images: ", error);
+              setGenerateButtonState(false); // Re-enable button
             })
             .generateSlideContent(newPrompt);
         })
@@ -415,11 +423,13 @@
               } else {
                 setStatus(response.statusMessage || "Image generation complete.", false);
               }
+              setGenerateButtonState(false); // Re-enable button
             })
             .withFailureHandler(error => {
               showSpinner(false);
               setStatus("Error generating images: " + error.message, true);
               console.error("Error generating images: ", error);
+              setGenerateButtonState(false); // Re-enable button
             })
             .generateSlideContent(newPrompt);
         })
@@ -430,8 +440,12 @@
       document.addEventListener("keydown", function(event) {
         // Check for Cmd+Enter (Mac) or Ctrl+Enter (Windows)
         if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
-          event.preventDefault();
-          submitForm(event);
+          const button = document.querySelector(".generate-button");
+          // Only submit if the button exists and is not disabled
+          if (button && !button.disabled) {
+            event.preventDefault();
+            submitForm(event);
+          }
         }
       });
     }
@@ -509,6 +523,15 @@
         .getAestheticAndVibe();
     }
     
+    function setGenerateButtonState(disabled) {
+      const button = document.querySelector(".generate-button");
+      if (button) {
+        button.disabled = disabled;
+        button.style.opacity = disabled ? "0.5" : "1";
+        button.style.cursor = disabled ? "not-allowed" : "pointer";
+      }
+    }
+
     window.onload = initialize;
   </script>
 </body>
