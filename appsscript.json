@@ -12,7 +12,7 @@
   "urlFetchWhitelist": ["https://api.groq.com/", "https://api.ideogram.ai/"],
   "addOns": {
     "common": {
-      "name": "Slide Maker AI",
+      "name": "PGA Google Slides Maker AI",
       "logoUrl": "https://placehold.co/120x120/fff/00a/png?text=AI",
       "layoutProperties": {
         "primaryColor": "#2772db",

@@ -1,4 +1,4 @@
-# Slide Maker AI
+# PGA Google Slides Maker AI
 
 ## Description
 

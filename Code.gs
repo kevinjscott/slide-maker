@@ -29,7 +29,8 @@ function onOpen(e) {
  */
 function onHomepage(e) {
   console.log("onHomepage event object:", JSON.stringify(e));
-  return createCard("Slide Maker AI");
+  showSidebar();
+  return null;
 }
 
 /**
@@ -46,40 +47,11 @@ function onFileScopeGranted(e) {
 }
 
 /**
- * Creates the main card for the add-on.
- *
- * @param {string} cardTitle The title for the card.
- * @return {CardService.Card} The card to display.
- */
-function createCard(cardTitle) {
-  return CardService.newCardBuilder()
-    .setHeader(CardService.newCardHeader().setTitle(cardTitle))
-    .addSection(
-      CardService.newCardSection()
-        .addWidget(
-          CardService.newTextParagraph().setText(
-            "Welcome, Kevin! This is the Slide Maker AI sidebar."
-          )
-        )
-        .addWidget(
-          CardService.newButtonSet().addButton(
-            CardService.newTextButton()
-              .setText("Show Sidebar")
-              .setOnClickAction(
-                CardService.newAction().setFunctionName("showSidebar")
-              )
-          )
-        )
-    )
-    .build();
-}
-
-/**
  * Opens the sidebar. This function is called when the "Show Sidebar" button is clicked.
  */
 function showSidebar() {
   const ui = HtmlService.createHtmlOutputFromFile("Sidebar")
-    .setTitle("Slide Maker AI Controls")
+    .setTitle("PGA Google Slides Maker AI")
     .setWidth(300);
   SlidesApp.getUi().showSidebar(ui);
 }
@@ -819,7 +791,14 @@ function generateNewPromptTemplate() {
     );
     const groqApiUrl = "https://api.groq.com/openai/v1/chat/completions";
 
-    const templateInstructions = `<template>A [flat 3d simple graphical illustration] (to be used as a full-screen PowerPoint slide) with a [fun, modern] style containing {list items or describe the scene}. Contains these large texts: "{list items if any, max 4 words each}" with the emphasis on "{one of the texts}". Use [puppies] for the text lettering.</template>
+    const templateInstructions = `
+<template>
+A [flat 3d simple graphical illustration] (to be used as a full-screen PowerPoint slide) with a [fun, modern] style containing {list items or describe the scene}.
+
+{describe texts} {describe relative emphasis of each text}
+
+{include info for the font e.g. style, characteristics. optionally specify objects used to create the letters}
+</template>
 
 ==========
 
@@ -827,15 +806,18 @@ The text above is a template for creating AI image prompts. Vary the items in sq
 
 Example outputs:
 
-A surreal digital collage (to be used as a full-screen PowerPoint slide) with a dreamy, colorful style containing {list items or describe the scene}. Contains these large texts: "{list items if any, max 4 words each}" with the emphasis on "{one of the texts}". Use clouds for the text lettering.
+A surreal digital collage (to be used as a full-screen PowerPoint slide) with a dreamy, colorful style containing {list items or describe the scene}. {describe texts} {describe relative emphasis of each text} {include info for the font e.g. style, characteristics. optionally specify objects used to create the letters}
 
-A watercolor illustration (to be used as a full-screen PowerPoint slide) with a gentle, calming style containing {list items or describe the scene}. Contains these large texts: "{list items if any, max 4 words each}" with the emphasis on "{one of the texts}". Use handwritten script fonts for the text lettering.
 
-A gorgeous 3d pencil sketch (to be used as a full-screen PowerPoint slide) with a vibrant, artistic style containing {list items or describe the scene}. Contains these large texts: "{list items if any, max 4 words each}" with the emphasis on "{one of the texts}". Use artistic, brush script fonts for the text lettering.
+A watercolor illustration (to be used as a full-screen PowerPoint slide) with a gentle, calming style containing {list items or describe the scene}. {describe texts} {describe relative emphasis of each text} {include info for the font e.g. style, characteristics. optionally specify objects used to create the letters}
 
-A crayon drawing (to be used as a full-screen PowerPoint slide) with a playful, childlike style containing {list items or describe the scene}. Contains these large texts: "{list items if any, max 4 words each}" with the emphasis on "{one of the texts}". Use chunky block fonts for the text lettering.
+A gorgeous 3d pencil sketch (to be used as a full-screen PowerPoint slide) with a vibrant, artistic style containing {list items or describe the scene}. {describe texts} {describe relative emphasis of each text} {include info for the font e.g. style, characteristics. optionally specify objects used to create the letters}
 
-A isometric flat design (to be used as a full-screen PowerPoint slide) with a clean, tech-inspired style containing {list items or describe the scene}. Contains these large texts: "{list items if any, max 4 words each}" with the emphasis on "{one of the texts}". Use geometric sans-serif fonts for the text lettering.
+A crayon drawing (to be used as a full-screen PowerPoint slide) with a playful, childlike style containing {list items or describe the scene}. {describe texts} {describe relative emphasis of each text} {include info for the font e.g. style, characteristics. optionally specify objects used to create the letters}
+
+A isometric flat design (to be used as a full-screen PowerPoint slide) with a clean, tech-inspired style containing {list items or describe the scene}. {describe texts} {describe relative emphasis of each text} {include info for the font e.g. style, characteristics. optionally specify objects used to create the letters}
+
+A flat 3d simple graphical illustration (to be used as a full-screen PowerPoint slide) with a fun, modern style containing {list items or describe the scene}. {describe texts} {describe relative emphasis of each text} {include info for the font e.g. style, characteristics. optionally specify objects used to create the letters}
 
 `;
 

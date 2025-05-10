@@ -214,7 +214,7 @@
     <form id="promptForm" onsubmit="submitForm(event)">
       <div class="form-group initial-prompt-container">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
-          <label for="initial_prompt">Prompt Template:</label>
+          <label for="initial_prompt">Prompt template:</label>
           <div class="template-buttons">
             <button type="button" id="save-template-button" title="Save Template" aria-label="Save Template">
               💾
@@ -237,12 +237,12 @@
       </div>
 
       <div class="form-group">
-        <label for="new_topic">New Topic:</label>
+        <label for="new_topic">Slide topic or details:</label>
         <textarea name="new_topic" id="new_topic" rows="5"></textarea>
       </div>
 
       <div class="form-group">
-        <label for="new_prompt">Your Image Prompt:</label>
+        <label for="new_prompt">Image prompt:</label>
         <textarea name="new_prompt" id="new_prompt" class="new-prompt" rows="10"></textarea>
       </div>
       
@@ -270,7 +270,11 @@
 
   <script>
     // Default Initial Prompt
-    const DEFAULT_INITIAL_PROMPT = 'A flat 3d simple graphical illustration (to be used as a full-screen PowerPoint slide) with a fun, modern style containing {list items or describe the scene}. Contains these large texts: "{list items if any, max 4 words each}" with the emphasis on "{one of the texts}". Use bold fonts for the text lettering.';
+    const DEFAULT_INITIAL_PROMPT = `A flat 3d simple graphical illustration (to be used as a full-screen PowerPoint slide) with a fun, modern style containing {list items or describe the scene}.
+
+{describe texts} {describe relative emphasis of each text}
+
+{include info for the font e.g. style, characteristics. optionally specify objects used to create the letters}`;
     let typingTimer;
     const doneTypingInterval = 300; // milliseconds
     let userTemplates = {};
