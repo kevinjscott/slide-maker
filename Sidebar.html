@@ -110,7 +110,7 @@
     }
     .shortcut-hint {
       font-size: 11px;
-      color: #ccc;
+      color: #ddd;
       font-weight: normal;
     }
     .spinner {
@@ -271,14 +271,14 @@
       <div class="form-group">
         <div id="image-prompt-toggle-header" style="display: flex; align-items: center; cursor: pointer; margin-bottom: 5px;">
           <span id="toggle-prompt-arrow" style="margin-right: 8px; font-family: sans-serif; width: 12px; text-align: center;">▶</span>
-          <label for="new_prompt" style="margin: 0; font-weight: bold; flex-grow: 1; cursor: pointer;">Actual image generation prompt:</label>
+          <label for="new_prompt" style="margin: 0; font-weight: bold; flex-grow: 1; cursor: pointer;">Tweak text and image content:</label>
           <a href="#" id="edit-image-prompt-link" style="font-size: 12px; color: #2772db; text-decoration: none; white-space: nowrap;">edit</a>
         </div>
         <textarea name="new_prompt" id="new_prompt" class="new-prompt" rows="10" style="width: 100%; box-sizing: border-box;"></textarea>
       </div>
       
       <button type="submit" class="button generate-button">
-        <span class="button-text-content">Generate Images <span class="shortcut-hint">(⌘+Enter)</span></span>
+        <span class="button-text-content">Generate Slide <span class="shortcut-hint">(⌘+Enter)</span></span>
         <div id="spinner" class="spinner"></div>
       </button>
     </form>
@@ -452,7 +452,8 @@
     function toggleImagePromptVisibility() {
       const textarea = document.getElementById("new_prompt");
       const arrow = document.getElementById("toggle-prompt-arrow");
-      if (textarea.style.display === "none") {
+
+      if (arrow.textContent === ARROW_RIGHT) {
         textarea.style.display = "block";
         arrow.textContent = ARROW_DOWN;
       } else {

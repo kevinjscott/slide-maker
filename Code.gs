@@ -474,18 +474,18 @@ function generateNewPrompt(initialPrompt, newTopic) {
 Create a prompt using the template, but make it about the given topic. Keep the style and punctuation EXACTLY the same! Anything inside {} is an instruction on how to vary the prompt, not part of the prompt itself, so don't include it.
 
 <example>
-<template>A flat 3d simple graphical illustration (to be used as a full-screen PowerPoint slide) with a mellow, modern style containing {list items or describe the scene}. Contains these large texts: "{list key concepts, max 4 words each}" with the emphasis on "{one of the texts}". Use bold fonts for the text lettering.</template>
+<template>A flat 3d simple graphical illustration (to be used as a full-screen PowerPoint slide) with a mellow, modern style containing {list items or describe the scene}. Contains ONLY these large texts: "{list key concepts, max 4 words each}" with the emphasis on "{one of the texts}". Use bold fonts for the text lettering.</template>
 <topic>Golden Retrievers make excellent pets</topic>
 <response>
-A flat 3d simple graphical illustration (to be used as a full-screen PowerPoint slide) with a mellow, modern style containing happy Golden Retrievers playing. Contains these large texts: "Golden Retriever", "Loyal Family Dogs", "Easy To Train", "Faithful Companions" with the emphasis on "Golden Retriever". Use bold fonts for the text lettering.
+A flat 3d simple graphical illustration (to be used as a full-screen PowerPoint slide) with a mellow, modern style containing happy Golden Retrievers playing. Contains ONLY these large texts: "Golden Retriever", "Loyal Family Dogs", "Easy To Train", "Faithful Companions" with the emphasis on "Golden Retriever". Use bold fonts for the text lettering.
 </response>
 </example>
 
 <example>
-<template>A flat 3d simple graphical illustration (to be used as a full-screen PowerPoint slide) with a mellow, modern style containing {list items or describe the scene}. Contains these large texts: "{list key concepts, max 4 words each}" with the emphasis on "{one of the texts}". Use bold fonts for the text lettering.</template>
+<template>A flat 3d simple graphical illustration (to be used as a full-screen PowerPoint slide) with a mellow, modern style containing {list items or describe the scene}. Contains ONLY these large texts: "{list key concepts, max 4 words each}" with the emphasis on "{one of the texts}". Use bold fonts for the text lettering.</template>
 <topic>Summit County is a great place to visit in the summer</topic>
 <response>
-A flat 3d simple graphical illustration (to be used as a full-screen PowerPoint slide) with a mellow, modern style containing mountains, lakes, and hiking trails. Contains these large texts: "Summer Vacation", "Mountain Scenery", "Summit County" with the emphasis on "Summit County". Use bold fonts for the text lettering.</response>
+A flat 3d simple graphical illustration (to be used as a full-screen PowerPoint slide) with a mellow, modern style containing mountains, lakes, and hiking trails. Contains ONLY these large texts: "Summer Vacation", "Mountain Scenery", "Summit County" with the emphasis on "Summit County". Use bold fonts for the text lettering.</response>
 </example>
 
 <template>` +
@@ -712,6 +712,9 @@ function showImagePickerDialog(imageUrls) {
   try {
     if (!imageUrls || !Array.isArray(imageUrls) || imageUrls.length === 0) {
       console.error("showImagePickerDialog: No image URLs provided");
+      // It's better to inform the user through the UI if possible, or at least log clearly.
+      // For now, returning an error string might be caught by the sidebar's status.
+      SlidesApp.getUi().alert("Error: No images were generated to display.");
       return "Error: No images to display";
     }
 
@@ -721,24 +724,23 @@ function showImagePickerDialog(imageUrls) {
       "images"
     );
 
-    // Store the image URLs temporarily in script properties
-    _getScriptProperties().setProperty(
-      PROP_TEMP_IMAGE_URLS,
-      JSON.stringify(imageUrls)
+    // Create an HTML template from the file.
+    const template = HtmlService.createTemplateFromFile("ImagePicker");
+    // Pass the imageUrls to the template. They will be accessible in scriptlets.
+    template.imageUrls = imageUrls;
+
+    // Evaluate the template to get the HTML output with data injected.
+    const htmlOutput = template.evaluate().setWidth(1000).setHeight(600);
+
+    SlidesApp.getUi().showModalDialog(
+      htmlOutput,
+      "Select an image for your slide"
     );
+    // TEMP_IMAGE_URLS is no longer needed as we pass data directly.
+    // _getScriptProperties().deleteProperty(PROP_TEMP_IMAGE_URLS); // Optional: cleanup if it was set before this flow
     console.log(
-      "Stored image URLs in script properties using PROP_TEMP_IMAGE_URLS"
+      "Image picker dialog displayed with URLs passed directly to template."
     );
-
-    // Create HTML output (not template)
-    const htmlOutput = HtmlService.createHtmlOutputFromFile("ImagePicker")
-      .setWidth(1000)
-      .setHeight(600)
-      // Title remains hardcoded as it's specific to this dialog
-      .setTitle("Select an Image");
-
-    // Show the modal dialog
-    SlidesApp.getUi().showModalDialog(htmlOutput, "Select an Image");
     return "Image selection dialog displayed";
   } catch (e) {
     console.error("Error showing image picker dialog:", e);
@@ -756,6 +758,11 @@ function showImagePickerDialog(imageUrls) {
  * @return {Array} Array of image URLs
  */
 function getStoredImageUrls() {
+  // This function will no longer be called by ImagePicker.html after the refactor.
+  // It can be kept for other potential uses or deprecated/removed.
+  console.warn(
+    "getStoredImageUrls was called, but should be deprecated if ImagePicker.html is refactored to accept URLs directly."
+  );
   const scriptProps = _getScriptProperties();
   const storedUrls = scriptProps.getProperty(PROP_TEMP_IMAGE_URLS);
 

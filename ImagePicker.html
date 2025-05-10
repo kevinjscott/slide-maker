@@ -164,8 +164,8 @@
 <body>
   <div class="image-viewer-container">
     <div class="navbar">
-      <div class="title">Select an Image</div>
-      <div class="key-hint">Use ← → arrow keys to navigate • Enter to select • Esc to cancel</div>
+      <div class="title">Use ← → arrow keys to navigate</div>
+      <div class="key-hint">Press ENTER to insert slide • ESC to cancel</div>
     </div>
     
     <div class="main-view">
@@ -189,57 +189,59 @@
   <script>
     // Track the current image index and all image URLs
     let currentIndex = 0;
-    let imageUrls = [];
+    let imageUrls = []; // This will be populated by the server-side scriptlet
     let imageLoaded = false;
     
-    // Initialize the viewer, fetch images from server
+    // Initialize the viewer
     function initialize() {
       console.log("Initializing image viewer...");
       
-      // Set the body to be focusable and focus it immediately
       document.body.setAttribute('tabindex', '-1');
       document.body.focus();
       
-      // Set up event listeners for arrows
       document.getElementById("prevArrow").addEventListener("click", navigateToPrevious);
       document.getElementById("nextArrow").addEventListener("click", navigateToNext);
-      
-      // Set up keyboard navigation
       document.addEventListener("keydown", handleKeyPress);
-      
-      // Fetch image URLs from server
-      fetchImagesFromServer();
+
+      // Directly use imageUrls injected by the server-side template
+      try {
+        // The following line will be replaced by a scriptlet in the actual file
+        // For demonstration, we assume imageUrls is globally available if injected
+        // In Apps Script, this would be: imageUrls = <?!= JSON.stringify(imageUrls) ?> || [];
+        // For the edit tool, we need to ensure this part is handled carefully.
+        // We will set it directly if the server passes it.
+        // If this script is run in an environment where server-side injection isn't present,
+        // imageUrls would remain its default empty array.
+        
+        // Check if imageUrls were successfully passed and populated
+        // The actual injection will happen via the server-side template evaluation.
+        // Here, we simulate that by assuming `this.imageUrlsFromServer` would be the way
+        // a templating engine might make it available, or it's directly in scope.
+        
+        // Let's assume the server will make `serverInjectedImageUrls` available in the global scope
+        // or we can access it via a special object if the templating engine provides one.
+        // For this edit, we will rely on the server directly populating `imageUrls` using a scriptlet.
+        
+        // The line below is crucial and needs to be a scriptlet in the final HTML
+        imageUrls = <?!= JSON.stringify(imageUrls || []) ?>; 
+
+        console.log("Received", imageUrls ? imageUrls.length : 0, "images from server template");
+
+        if (imageUrls && imageUrls.length > 0) {
+          currentIndex = 0;
+          preloadAllImages(imageUrls);
+          displayCurrentImage();
+        } else {
+          showError("No images were provided to the viewer.");
+        }
+      } catch (e) {
+        console.error("Error processing injected image URLs:", e);
+        showError("Could not load image data.");
+      }
     }
     
-    // Fetch images from the server-side properties
-    function fetchImagesFromServer() {
-      console.log("Fetching images from server...");
-      
-      google.script.run
-        .withSuccessHandler(function(urls) {
-          console.log("Received", urls ? urls.length : 0, "images from server");
-          
-          if (urls && urls.length > 0) {
-            imageUrls = urls;
-            currentIndex = 0;
-            
-            // Preload all images in the background
-            preloadAllImages(imageUrls);
-            
-            // Load the first image
-            displayCurrentImage();
-          } else {
-            showError("No images were received from the server.");
-          }
-        })
-        .withFailureHandler(function(error) {
-          console.error("Error retrieving images:", error);
-          showError("Failed to retrieve images: " + error);
-        })
-        .getStoredImageUrls();
-    }
+    // fetchImagesFromServer function is no longer needed and will be removed.
     
-    // Preload all images to improve navigation performance
     function preloadAllImages(urls) {
       if (!urls || urls.length === 0) return;
       
